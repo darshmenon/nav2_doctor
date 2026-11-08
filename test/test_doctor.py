@@ -180,3 +180,142 @@ def test_custom_startup_grace():
     d = healthy(); d.startup_s = 0.0; d.started = 0.0
     d.lifecycle['controller_server'] = 'inactive'
     assert 'NODE_INACTIVE' in codes(d, 1.0)
+
+
+# ---- NO_PROGRESS, tunable thresholds, JSON ------------------------------
+def _goal_run(moving, progress_s=15.0):
+    d = Doctor(progress_s=progress_s)
+    d.set_goal_active(True, 0.0)
+    for i in range(0, 31):
+        d.pose(i * 0.5 if moving else 1.0, 0.0, float(i))
+    return d
+
+
+def test_no_progress_when_goal_active_and_robot_still():
+    assert 'NO_PROGRESS' in [x.code for x in _goal_run(False).diagnose(30.0)]
+
+
+def test_progress_when_robot_moves():
+    assert 'NO_PROGRESS' not in [x.code for x in _goal_run(True).diagnose(30.0)]
+
+
+def test_no_progress_needs_time_and_active_goal():
+    d = Doctor()
+    d.set_goal_active(True, 0.0)
+    d.pose(0, 0, 0.0); d.pose(0, 0, 5.0)
+    assert 'NO_PROGRESS' not in [x.code for x in d.diagnose(5.0)]
+    d2 = _goal_run(False)
+    d2.set_goal_active(False, 30.0)
+    assert 'NO_PROGRESS' not in [x.code for x in d2.diagnose(30.0)]
+
+
+def test_custom_stale_threshold():
+    d = Doctor(stale_s=10.0)
+    d.tf('map', 'odom', 0.0); d.tf('odom', 'base_link', 0.0)
+    d.pose(0, 0, 0.0); d.seen('scan', 0.0)
+    assert 'ODOM_STALE' not in [x.code for x in d.diagnose(5.0)]
+    assert 'ODOM_STALE' in [x.code for x in d.diagnose(11.0)]
+
+
+def test_custom_flap_count():
+    d = Doctor(flap_count=2)
+    d.goal(0.0); d.goal(1.0)
+    assert 'GOAL_FLAPPING' in [x.code for x in d.diagnose(1.0)]
+
+
+def test_to_json_roundtrip():
+    import json
+    from nav2_doctor.doctor import to_json
+    out = json.loads(to_json(Doctor().diagnose(1.0), 'r1', 123.0))
+    assert out['ns'] == 'r1' and out['ok'] is False
+    assert out['findings'][0]['code'] == 'TF_NONE'
+
+
+def test_no_cmd_subscriber():
+    d = healthy(); d.cmd(0.2, 0, 0.9); d.cmd_subscribers = 0
+    assert 'NO_CMD_SUBSCRIBER' in codes(d, 1.0)
+    d.cmd_subscribers = 1
+    assert 'NO_CMD_SUBSCRIBER' not in codes(d, 1.0)
+
+
+def test_cmd_no_motion():
+    d = healthy()
+    for i in range(0, 80):
+        t = i * 0.1
+        d.tf('map', 'odom', t); d.tf('odom', 'base_link', t); d.seen('scan', t)
+        d.cmd(0.2, 0, t); d.pose(0.0, 0.0, t)
+    assert 'CMD_NO_MOTION' in codes(d, 7.9)
+
+
+def test_cmd_with_motion_ok():
+    d = healthy()
+    for i in range(0, 80):
+        t = i * 0.1
+        d.tf('map', 'odom', t); d.tf('odom', 'base_link', t); d.seen('scan', t)
+        d.cmd(0.2, 0, t); d.pose(t * 0.2, 0.0, t)
+    assert 'CMD_NO_MOTION' not in codes(d, 7.9)
+
+
+def test_clock_skew():
+    d = healthy(); d.tf('odom', 'base_link', 1.0, skew=5.0)
+    assert 'CLOCK_SKEW' in codes(d, 1.0)
+    d.tf('odom', 'base_link', 1.0, skew=0.01)
+    assert 'CLOCK_SKEW' not in codes(d, 1.0)
+
+
+def test_inflation_small():
+    d = healthy(); d.params = {'inflation_radius': 0.1, 'robot_radius': 0.3}
+    assert 'INFLATION_SMALL' in codes(d, 1.0)
+
+
+def test_nothing_visible_hint():
+    d = Doctor(); d.lifecycle = {'controller_server': None}
+    assert 'NO_NAV2_VISIBLE' in codes(d, 1.0)
+
+
+
+def test_every_code_has_hint():
+    import re
+    from nav2_doctor.doctor import HINTS
+    src = open(os.path.join(os.path.dirname(__file__), '..', 'nav2_doctor', 'doctor.py')).read()
+    for code in set(re.findall(r"Finding\('(?:ERROR|WARN)', f?'([A-Z_]+)'", src)):
+        assert code in HINTS, code
+
+
+def test_fmt_hints_and_json():
+    import json
+    from nav2_doctor.doctor import fmt, to_json
+    f = Doctor().diagnose(1.0)
+    assert '->' in fmt(f, hints=True) and '->' not in fmt(f)
+    assert json.loads(to_json(f, '', 0))['findings'][0]['hint']
+
+
+def test_amcl_uncertain():
+    d = healthy(); d.amcl(0.9, 0.1, 0.5)
+    assert 'AMCL_UNCERTAIN' in codes(d, 1.0)
+
+
+def test_amcl_confident():
+    d = healthy(); d.amcl(0.05, 0.05, 0.5)
+    assert 'AMCL_UNCERTAIN' not in codes(d, 1.0)
+
+
+def test_recovery_loop():
+    d = healthy()
+    for t, n in ((1, 'Spin'), (5, 'BackUp'), (9, 'Wait'), (10, 'ComputePathToPose')):
+        d.recovery(n, t)
+    assert 'RECOVERY_LOOP' in codes(d, 10.5)
+
+
+def test_recovery_loop_expires():
+    d = healthy(200.0)
+    for t in (1, 5, 9):
+        d.recovery('Spin', t)
+    d.recovery('Spin', 200.0)   # prunes old entries
+    assert 'RECOVERY_LOOP' not in codes(d, 200.5)
+
+
+def test_inscribed_radius():
+    from nav2_doctor.doctor import inscribed_radius
+    assert abs(inscribed_radius('[[0.3,0.2],[0.3,-0.2],[-0.3,-0.2],[-0.3,0.2]]') - 0.2) < 1e-9
+    assert inscribed_radius('[]') is None and inscribed_radius('junk') is None

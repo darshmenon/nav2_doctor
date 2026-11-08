@@ -10,6 +10,8 @@
 
 *Rendered from real output captured on a Gazebo maze sim: healthy, then the bridge is paused and the doctor names the dead TF edges, odom and scan, and the Nav2 nodes that never activated. Source: `docs/demo_raw.txt`, `docs/make_demo_gif.py`.*
 
+Born in [rosnav](https://github.com/darshmenon/rosnav), a ROS 2 Nav2 stack with SLAM, frontier exploration and multi-robot fleets; rosnav ships this as `scripts/nav2_doctor.py` and tested it on its live Gazebo maze sim.
+
 ## Quick start
 
 ```bash
@@ -39,6 +41,8 @@ ERROR [COSTMAP_STALE] local costmap not updating (3.8s) - usually a TF or scan p
 | `NODE_INACTIVE` | error | a Nav2 server is not `active` after the startup grace (60 s, `--startup-grace`) |
 | `NODE_STARTING` / `NODE_MISSING` | warn | still inside the grace period, or the lifecycle service is not there |
 | `GOAL_FLAPPING` | warn | 4 or more goals cancelled or aborted within 30 s (an oscillating goal source) |
+| `AMCL_UNCERTAIN` | warn | `/amcl_pose` covariance above 0.5 m^2, so the robot is poorly localised |
+| `NO_PROGRESS` | warn | a goal is active but odometry shows the robot hasn't moved (15 s, 0.1 m by default) |
 | `CMD_ZERO` / `NO_CMD_VEL` | error | a goal is active but `cmd_vel` is zero or absent |
 
 Checked servers: `controller_server`, `planner_server`, `bt_navigator`, `behavior_server`, `smoother_server`, `waypoint_follower`. Verified on Humble against a live Gazebo sim (a frozen bridge is caught within about 3 s and clears on recovery) and in CI on Humble and Jazzy against a fake Nav2 graph.
@@ -49,15 +53,15 @@ When Nav2 sits still, finding the cause means juggling `ros2 topic hz`, `tf2_ech
 
 ## Limits
 
-- Fixed thresholds (2 s stale, 4 flaps in 30 s) for now; no flags to change them yet.
+- Thresholds are tunable with `--stale`, `--flap-count`, `--flap-window`, `--progress-time`, `--progress-dist`.
 - The costmap check needs `/local_costmap/costmap`; the goal checks need `navigate_to_pose`.
 - One robot per run; use `--ns` once per robot.
-- Reports to the terminal only; no `/diagnostics` output or JSON yet.
+- Reports to the terminal (text or `--json`); no `/diagnostics` output yet.
 
 ## Roadmap
 
-- `--json` output and tunable thresholds; a `/diagnostics` publisher
-- robot makes no progress while a goal is active; repeating recovery behaviours; AMCL covariance too high
+- a `/diagnostics` publisher
+- repeating recovery behaviours; AMCL covariance too high
 - inert costmap filters and a map-distortion check (`map->odom` yaw ramp)
 - multi-robot auto-discovery; ERROR lines from `/rosout` tied to the cause
 - PyPI release and a live Jazzy test

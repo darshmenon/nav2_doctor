@@ -36,6 +36,8 @@ class FakeNav2(Node):
         self.odom_pub = self.create_publisher(Odometry, f'{ns}/odom', 10)
         self.scan_pub = self.create_publisher(LaserScan, f'{ns}/scan', 10)
         self.cmd_pub = self.create_publisher(Twist, f'{ns}/cmd_vel', 10)
+        if cfg.get('subscriber', True):   # stands in for the base driver
+            self.create_subscription(Twist, f'{ns}/cmd_vel', lambda m: None, 10)
         self.st_pub = self.create_publisher(GoalStatusArray, f'{ns}/navigate_to_pose/_action/status', 10)
         for n in NODES:
             self.create_service(GetState, f'{ns}/{n}/get_state', lambda rq, rs, n=n: self._state(n, rs))
@@ -65,7 +67,10 @@ class FakeNav2(Node):
         if edges:
             self.tf_pub.publish(TFMessage(transforms=edges))
         if self.alive('stop_odom'):
-            self.odom_pub.publish(Odometry())
+            od = Odometry()
+            if self.cfg.get('cmd') == 'move' and not self.cfg.get('frozen_odom'):
+                od.pose.pose.position.x = 0.2 * (time.monotonic() - self.t0)   # follows the commanded 0.2 m/s
+            self.odom_pub.publish(od)
         if self.alive('stop_scan'):
             self.scan_pub.publish(LaserScan())
         tw = Twist()
@@ -175,3 +180,13 @@ def test_version_flag():
     p = subprocess.run([sys.executable, '-m', 'nav2_doctor.doctor', '--version'],
                        capture_output=True, text=True, cwd=ROOT)
     assert p.stdout.startswith('nav2_doctor ') and p.returncode == 0
+
+
+def test_no_cmd_subscriber():
+    codes, rc, out = run({'cmd': 'move', 'subscriber': False})
+    assert 'NO_CMD_SUBSCRIBER' in codes and rc == 1, out
+
+
+def test_cmd_without_motion():
+    codes, rc, out = run({'cmd': 'move', 'frozen_odom': True}, secs=9)
+    assert 'CMD_NO_MOTION' in codes and rc == 1, out
