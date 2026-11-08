@@ -14,7 +14,7 @@ NAV2_NODES = ['controller_server', 'planner_server', 'bt_navigator',
 STALE_S = 2.0          # a stream is "stale" if silent this long
 FLAP_WINDOW_S = 30.0   # goal-flapping look-back
 STARTUP_S = 60.0       # grace period before inactive nodes count as errors
-FLAP_COUNT = 4         # new goals inside window => flapping
+FLAP_COUNT = 4         # goals cancelled/aborted inside the window => flapping
 
 
 @dataclass
