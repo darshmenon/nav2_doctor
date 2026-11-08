@@ -1,0 +1,25 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.10'}
+      - run: pip install pytest && python -m pytest -q test
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        distro: [humble, jazzy]
+    container: ros:${{ matrix.distro }}-ros-base
+    steps:
+      - uses: actions/checkout@v4
+      - name: colcon build + test
+        shell: bash
+        run: |
+          source /opt/ros/${{ matrix.distro }}/setup.bash
+          mkdir -p ws/src && cp -r . ws/src/nav2_doctor && cd ws
+          colcon build --packages-select nav2_doctor
+          source install/setup.bash && nav2_doctor --version 2>/dev/null || ros2 run nav2_doctor nav2_doctor --version
