@@ -14,8 +14,8 @@ jobs:
       - run: pip install pytest && python -m pytest -q test
       - name: tag matches package version
         run: test "v$(sed -n 's:.*<version>\(.*\)</version>.*:\1:p' package.xml)" = "${GITHUB_REF_NAME}"
-      - run: tar czf nav2_doctor-${GITHUB_REF_NAME}.tar.gz --exclude=.git --transform "s,^\.,nav2_doctor," .
+      - run: git archive --prefix=nav2_doctor/ -o "$RUNNER_TEMP/nav2_doctor-${GITHUB_REF_NAME}.tar.gz" HEAD
       - uses: softprops/action-gh-release@v2
         with:
-          files: nav2_doctor-*.tar.gz
+          files: ${{ runner.temp }}/nav2_doctor-*.tar.gz
           body_path: CHANGELOG.md

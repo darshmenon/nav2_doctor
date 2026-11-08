@@ -6,6 +6,10 @@
 
 Why isn't my robot moving? Attach to any running Nav2 stack and find out.
 
+![nav2_doctor catching a frozen TF tree and a Nav2 lifecycle that never came up](docs/demo.gif)
+
+*Rendered from real output captured on a Gazebo maze sim: healthy, then the bridge is paused and the doctor names the dead TF edges, odom and scan, and the Nav2 nodes that never activated. Source: `docs/demo_raw.txt`, `docs/make_demo_gif.py`.*
+
 ```bash
 ros2 run nav2_doctor nav2_doctor                 # live, every 2s
 ros2 run nav2_doctor nav2_doctor --ns robot1     # namespaced robot

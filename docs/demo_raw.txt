@@ -1,0 +1,275 @@
+
+--- nav2_doctor 12:24:34 ns="" ---
+[32mOK   [0m [HEALTHY] no stall causes detected
+
+--- nav2_doctor 12:24:35 ns="" ---
+[32mOK   [0m [HEALTHY] no stall causes detected
+
+--- nav2_doctor 12:24:36 ns="" ---
+[32mOK   [0m [HEALTHY] no stall causes detected
+
+--- nav2_doctor 12:24:37 ns="" ---
+[33mWARN [0m [NODE_STARTING] controller_server is "inactive" - Nav2 may still be starting up
+[33mWARN [0m [NODE_STARTING] planner_server is "inactive" - Nav2 may still be starting up
+[33mWARN [0m [NODE_STARTING] bt_navigator is "unconfigured" - Nav2 may still be starting up
+[33mWARN [0m [NODE_STARTING] behavior_server is "unconfigured" - Nav2 may still be starting up
+[33mWARN [0m [NODE_STARTING] smoother_server is "inactive" - Nav2 may still be starting up
+[33mWARN [0m [NODE_STARTING] waypoint_follower is "unconfigured" - Nav2 may still be starting up
+[32mOK   [0m [HEALTHY] no stall causes detected
+
+--- nav2_doctor 12:24:38 ns="" ---
+[33mWARN [0m [NODE_STARTING] controller_server is "inactive" - Nav2 may still be starting up
+[33mWARN [0m [NODE_STARTING] planner_server is "inactive" - Nav2 may still be starting up
+[33mWARN [0m [NODE_STARTING] bt_navigator is "unconfigured" - Nav2 may still be starting up
+[33mWARN [0m [NODE_STARTING] behavior_server is "unconfigured" - Nav2 may still be starting up
+[33mWARN [0m [NODE_STARTING] smoother_server is "inactive" - Nav2 may still be starting up
+[33mWARN [0m [NODE_STARTING] waypoint_follower is "unconfigured" - Nav2 may still be starting up
+[32mOK   [0m [HEALTHY] no stall causes detected
+
+--- nav2_doctor 12:24:39 ns="" ---
+[31mERROR[0m [NODE_INACTIVE] controller_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] planner_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] bt_navigator is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] behavior_server is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] smoother_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] waypoint_follower is "unconfigured", not active - lifecycle manager stuck
+
+--- nav2_doctor 12:24:40 ns="" ---
+[31mERROR[0m [NODE_INACTIVE] controller_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] planner_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] bt_navigator is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] behavior_server is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] smoother_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] waypoint_follower is "unconfigured", not active - lifecycle manager stuck
+
+--- nav2_doctor 12:24:41 ns="" ---
+[31mERROR[0m [NODE_INACTIVE] controller_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] planner_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] bt_navigator is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] behavior_server is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] smoother_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] waypoint_follower is "unconfigured", not active - lifecycle manager stuck
+
+--- nav2_doctor 12:24:42 ns="" ---
+[31mERROR[0m [NODE_INACTIVE] controller_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] planner_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] bt_navigator is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] behavior_server is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] smoother_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] waypoint_follower is "unconfigured", not active - lifecycle manager stuck
+
+--- nav2_doctor 12:24:43 ns="" ---
+[31mERROR[0m [NODE_INACTIVE] controller_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] planner_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] bt_navigator is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] behavior_server is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] smoother_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] waypoint_follower is "unconfigured", not active - lifecycle manager stuck
+
+--- nav2_doctor 12:24:44 ns="" ---
+[31mERROR[0m [TF_EDGE_STALE] transform odom->base_link stopped 2.7s ago while other TF is alive
+[31mERROR[0m [TF_EDGE_STALE] transform base_link->left_wheel stopped 2.7s ago while other TF is alive
+[31mERROR[0m [TF_EDGE_STALE] transform base_link->right_wheel stopped 2.7s ago while other TF is alive
+[31mERROR[0m [ODOM_STALE] odometry silent for 2.7s
+[31mERROR[0m [SCAN_STALE] laser scan silent for 2.7s
+[31mERROR[0m [NODE_INACTIVE] controller_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] planner_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] bt_navigator is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] behavior_server is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] smoother_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] waypoint_follower is "unconfigured", not active - lifecycle manager stuck
+
+--- nav2_doctor 12:24:45 ns="" ---
+[31mERROR[0m [TF_EDGE_STALE] transform odom->base_link stopped 3.7s ago while other TF is alive
+[31mERROR[0m [TF_EDGE_STALE] transform base_link->left_wheel stopped 3.7s ago while other TF is alive
+[31mERROR[0m [TF_EDGE_STALE] transform base_link->right_wheel stopped 3.7s ago while other TF is alive
+[31mERROR[0m [ODOM_STALE] odometry silent for 3.7s
+[31mERROR[0m [SCAN_STALE] laser scan silent for 3.7s
+[31mERROR[0m [NODE_INACTIVE] controller_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] planner_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] bt_navigator is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] behavior_server is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] smoother_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] waypoint_follower is "unconfigured", not active - lifecycle manager stuck
+
+--- nav2_doctor 12:24:46 ns="" ---
+[31mERROR[0m [TF_EDGE_STALE] transform odom->base_link stopped 4.7s ago while other TF is alive
+[31mERROR[0m [TF_EDGE_STALE] transform base_link->left_wheel stopped 4.7s ago while other TF is alive
+[31mERROR[0m [TF_EDGE_STALE] transform base_link->right_wheel stopped 4.7s ago while other TF is alive
+[31mERROR[0m [ODOM_STALE] odometry silent for 4.7s
+[31mERROR[0m [SCAN_STALE] laser scan silent for 4.7s
+[31mERROR[0m [NODE_INACTIVE] controller_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] planner_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] bt_navigator is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] behavior_server is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] smoother_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] waypoint_follower is "unconfigured", not active - lifecycle manager stuck
+
+--- nav2_doctor 12:24:47 ns="" ---
+[31mERROR[0m [TF_EDGE_STALE] transform odom->base_link stopped 5.7s ago while other TF is alive
+[31mERROR[0m [TF_EDGE_STALE] transform base_link->left_wheel stopped 5.7s ago while other TF is alive
+[31mERROR[0m [TF_EDGE_STALE] transform base_link->right_wheel stopped 5.7s ago while other TF is alive
+[31mERROR[0m [ODOM_STALE] odometry silent for 5.7s
+[31mERROR[0m [SCAN_STALE] laser scan silent for 5.7s
+[31mERROR[0m [NODE_INACTIVE] controller_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] planner_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] bt_navigator is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] behavior_server is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] smoother_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] waypoint_follower is "unconfigured", not active - lifecycle manager stuck
+
+--- nav2_doctor 12:24:48 ns="" ---
+[31mERROR[0m [TF_EDGE_STALE] transform odom->base_link stopped 6.7s ago while other TF is alive
+[31mERROR[0m [TF_EDGE_STALE] transform base_link->left_wheel stopped 6.7s ago while other TF is alive
+[31mERROR[0m [TF_EDGE_STALE] transform base_link->right_wheel stopped 6.7s ago while other TF is alive
+[31mERROR[0m [ODOM_STALE] odometry silent for 6.7s
+[31mERROR[0m [SCAN_STALE] laser scan silent for 6.7s
+[31mERROR[0m [NODE_INACTIVE] controller_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] planner_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] bt_navigator is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] behavior_server is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] smoother_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] waypoint_follower is "unconfigured", not active - lifecycle manager stuck
+
+--- nav2_doctor 12:24:49 ns="" ---
+[31mERROR[0m [TF_EDGE_STALE] transform odom->base_link stopped 7.7s ago while other TF is alive
+[31mERROR[0m [TF_EDGE_STALE] transform base_link->left_wheel stopped 7.7s ago while other TF is alive
+[31mERROR[0m [TF_EDGE_STALE] transform base_link->right_wheel stopped 7.7s ago while other TF is alive
+[31mERROR[0m [ODOM_STALE] odometry silent for 7.7s
+[31mERROR[0m [SCAN_STALE] laser scan silent for 7.7s
+[31mERROR[0m [NODE_INACTIVE] controller_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] planner_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] bt_navigator is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] behavior_server is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] smoother_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] waypoint_follower is "unconfigured", not active - lifecycle manager stuck
+
+--- nav2_doctor 12:24:50 ns="" ---
+[31mERROR[0m [TF_EDGE_STALE] transform odom->base_link stopped 8.7s ago while other TF is alive
+[31mERROR[0m [TF_EDGE_STALE] transform base_link->left_wheel stopped 8.7s ago while other TF is alive
+[31mERROR[0m [TF_EDGE_STALE] transform base_link->right_wheel stopped 8.7s ago while other TF is alive
+[31mERROR[0m [ODOM_STALE] odometry silent for 8.7s
+[31mERROR[0m [SCAN_STALE] laser scan silent for 8.7s
+[31mERROR[0m [NODE_INACTIVE] controller_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] planner_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] bt_navigator is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] behavior_server is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] smoother_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] waypoint_follower is "unconfigured", not active - lifecycle manager stuck
+
+--- nav2_doctor 12:24:51 ns="" ---
+[31mERROR[0m [NODE_INACTIVE] controller_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] planner_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] bt_navigator is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] behavior_server is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] smoother_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] waypoint_follower is "unconfigured", not active - lifecycle manager stuck
+
+--- nav2_doctor 12:24:52 ns="" ---
+[31mERROR[0m [NODE_INACTIVE] controller_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] planner_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] bt_navigator is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] behavior_server is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] smoother_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] waypoint_follower is "unconfigured", not active - lifecycle manager stuck
+
+--- nav2_doctor 12:24:53 ns="" ---
+[31mERROR[0m [TF_EDGE_STALE] transform odom->base_link stopped 2.6s ago while other TF is alive
+[31mERROR[0m [TF_EDGE_STALE] transform base_link->left_wheel stopped 2.6s ago while other TF is alive
+[31mERROR[0m [TF_EDGE_STALE] transform base_link->right_wheel stopped 2.6s ago while other TF is alive
+[31mERROR[0m [ODOM_STALE] odometry silent for 2.6s
+[31mERROR[0m [SCAN_STALE] laser scan silent for 2.6s
+[31mERROR[0m [NODE_INACTIVE] controller_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] planner_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] bt_navigator is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] behavior_server is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] smoother_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] waypoint_follower is "unconfigured", not active - lifecycle manager stuck
+
+--- nav2_doctor 12:24:54 ns="" ---
+[31mERROR[0m [TF_EDGE_STALE] transform odom->base_link stopped 3.6s ago while other TF is alive
+[31mERROR[0m [TF_EDGE_STALE] transform base_link->left_wheel stopped 3.6s ago while other TF is alive
+[31mERROR[0m [TF_EDGE_STALE] transform base_link->right_wheel stopped 3.6s ago while other TF is alive
+[31mERROR[0m [ODOM_STALE] odometry silent for 3.6s
+[31mERROR[0m [SCAN_STALE] laser scan silent for 3.6s
+[31mERROR[0m [NODE_INACTIVE] controller_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] planner_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] bt_navigator is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] behavior_server is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] smoother_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] waypoint_follower is "unconfigured", not active - lifecycle manager stuck
+
+--- nav2_doctor 12:24:55 ns="" ---
+[31mERROR[0m [TF_EDGE_STALE] transform odom->base_link stopped 4.6s ago while other TF is alive
+[31mERROR[0m [TF_EDGE_STALE] transform base_link->left_wheel stopped 4.6s ago while other TF is alive
+[31mERROR[0m [TF_EDGE_STALE] transform base_link->right_wheel stopped 4.6s ago while other TF is alive
+[31mERROR[0m [ODOM_STALE] odometry silent for 4.6s
+[31mERROR[0m [SCAN_STALE] laser scan silent for 4.6s
+[31mERROR[0m [NODE_INACTIVE] controller_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] planner_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] bt_navigator is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] behavior_server is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] smoother_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] waypoint_follower is "unconfigured", not active - lifecycle manager stuck
+
+--- nav2_doctor 12:24:56 ns="" ---
+[31mERROR[0m [TF_EDGE_STALE] transform odom->base_link stopped 5.6s ago while other TF is alive
+[31mERROR[0m [TF_EDGE_STALE] transform base_link->left_wheel stopped 5.6s ago while other TF is alive
+[31mERROR[0m [TF_EDGE_STALE] transform base_link->right_wheel stopped 5.6s ago while other TF is alive
+[31mERROR[0m [ODOM_STALE] odometry silent for 5.6s
+[31mERROR[0m [SCAN_STALE] laser scan silent for 5.6s
+[31mERROR[0m [NODE_INACTIVE] controller_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] planner_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] bt_navigator is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] behavior_server is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] smoother_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] waypoint_follower is "unconfigured", not active - lifecycle manager stuck
+
+--- nav2_doctor 12:24:57 ns="" ---
+[31mERROR[0m [NODE_INACTIVE] controller_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] planner_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] bt_navigator is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] behavior_server is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] smoother_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] waypoint_follower is "unconfigured", not active - lifecycle manager stuck
+
+--- nav2_doctor 12:24:58 ns="" ---
+[31mERROR[0m [NODE_INACTIVE] controller_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] planner_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] bt_navigator is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] behavior_server is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] smoother_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] waypoint_follower is "unconfigured", not active - lifecycle manager stuck
+
+--- nav2_doctor 12:24:59 ns="" ---
+[31mERROR[0m [TF_EDGE_STALE] transform map->odom stopped 2.9s ago while other TF is alive
+[31mERROR[0m [NODE_INACTIVE] controller_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] planner_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] bt_navigator is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] behavior_server is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] smoother_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] waypoint_follower is "unconfigured", not active - lifecycle manager stuck
+
+--- nav2_doctor 12:25:00 ns="" ---
+[31mERROR[0m [NODE_INACTIVE] controller_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] planner_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] bt_navigator is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] behavior_server is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] smoother_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] waypoint_follower is "unconfigured", not active - lifecycle manager stuck
+
+--- nav2_doctor 12:25:01 ns="" ---
+[31mERROR[0m [NODE_INACTIVE] controller_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] planner_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] bt_navigator is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] behavior_server is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] smoother_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] waypoint_follower is "unconfigured", not active - lifecycle manager stuck
+
+--- nav2_doctor 12:25:02 ns="" ---
+[31mERROR[0m [NODE_INACTIVE] controller_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] planner_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] bt_navigator is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] behavior_server is "unconfigured", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] smoother_server is "inactive", not active - lifecycle manager stuck
+[31mERROR[0m [NODE_INACTIVE] waypoint_follower is "unconfigured", not active - lifecycle manager stuck
