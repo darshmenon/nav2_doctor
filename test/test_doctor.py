@@ -319,3 +319,12 @@ def test_inscribed_radius():
     from nav2_doctor.doctor import inscribed_radius
     assert abs(inscribed_radius('[[0.3,0.2],[0.3,-0.2],[-0.3,-0.2],[-0.3,0.2]]') - 0.2) < 1e-9
     assert inscribed_radius('[]') is None and inscribed_radius('junk') is None
+
+
+def test_readiness_verdict():
+    from nav2_doctor.doctor import Finding, readiness_verdict
+    assert 'NOT READY' in readiness_verdict([Finding('ERROR', 'TF_EDGE_STALE', 'x'), Finding('WARN', 'W', 'y')])
+    assert 'TF_EDGE_STALE' in readiness_verdict([Finding('ERROR', 'TF_EDGE_STALE', 'x')])
+    v = readiness_verdict([Finding('WARN', 'RECOVERY_LOOP', 'y')])
+    assert 'READY' in v and 'NOT' not in v and 'RECOVERY_LOOP' in v
+    assert 'READY' in readiness_verdict([Finding('OK', 'HEALTHY', 'ok')])

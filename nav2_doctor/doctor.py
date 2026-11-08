@@ -8,7 +8,7 @@ import json
 import time
 from dataclasses import dataclass
 
-__version__ = '0.3.0'
+__version__ = '0.4.0'
 
 NAV2_NODES = ['controller_server', 'planner_server', 'bt_navigator',
               'behavior_server', 'smoother_server', 'waypoint_follower']
@@ -282,6 +282,14 @@ def fmt(findings, hints=False):
     return '\n'.join(out)
 
 
+def readiness_verdict(findings):
+    errors = [x.code for x in findings if x.level == 'ERROR']
+    warns = [x.code for x in findings if x.level == 'WARN']
+    if errors:
+        return f'\033[31mNOT READY\033[0m - {len(errors)} blocking: {", ".join(errors)}'
+    return '\033[32mREADY\033[0m' + (f' - {len(warns)} warning(s): {", ".join(warns)}' if warns else '')
+
+
 def to_json(findings, ns, now_wall):
     return json.dumps({'time': now_wall, 'ns': ns,
                        'ok': not any(x.level == 'ERROR' for x in findings),
@@ -318,7 +326,12 @@ def main(argv=None):
     ap.add_argument('--diagnostics', action='store_true',
                     help='also publish findings as diagnostic_msgs/DiagnosticArray on /diagnostics')
     ap.add_argument('--once', type=float, default=0.0, help='watch N seconds, print one report, exit')
+    ap.add_argument('--ready', nargs='?', type=float, const=10.0, default=None, metavar='SECS',
+                    help='pre-flight: watch SECS (default 10), print hints and a READY / NOT READY verdict; '
+                         'exit 1 if not ready (lifecycle nodes must already be active)')
     args, ros_args = ap.parse_known_args(argv)
+    if args.ready is not None:
+        args.once, args.hints, args.startup_grace = args.ready, True, 0.0
 
     rclpy.init(args=ros_args)
     node = Node('nav2_doctor')
@@ -439,7 +452,11 @@ def main(argv=None):
 
     def tick():
         if args.once and clock() - start >= args.once:
-            exit_code[0] = 1 if any(x.level == 'ERROR' for x in report()) else 0
+            found = report()
+            errors = [x for x in found if x.level == 'ERROR']
+            exit_code[0] = 1 if errors else 0
+            if args.ready is not None and not args.json:
+                print(readiness_verdict(found), flush=True)
             raise SystemExit
         if not args.once:
             report()

@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.4.0
+- `--ready [SECS]`: pre-flight mode. Watches SECS (default 10), prints hints and a `READY` / `NOT READY` verdict, exits 1 on any blocking ERROR.
+
 ## 0.3.0
 - New checks: `NO_CMD_SUBSCRIBER`, `CMD_NO_MOTION`, `CLOCK_SKEW`, `INFLATION_SMALL`, `NO_NAV2_VISIBLE`.
 - `RECOVERY_LOOP`: repeated Spin/BackUp/Wait/ClearCostmap recoveries from `/behavior_tree_log`.

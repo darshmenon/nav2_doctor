@@ -18,6 +18,7 @@ Born in [rosnav](https://github.com/darshmenon/rosnav), a ROS 2 Nav2 stack with 
 ros2 run nav2_doctor nav2_doctor                 # live, a report every 2 s
 ros2 run nav2_doctor nav2_doctor --ns robot1     # a namespaced robot
 ros2 run nav2_doctor nav2_doctor --once 5        # watch 5 s, print one report, exit 1 if any ERROR (for CI)
+ros2 run nav2_doctor nav2_doctor --ready            # pre-flight: hints + READY / NOT READY verdict, exit 1 if not ready
 ```
 
 A real report, 3.5 s after the sim bridge was frozen:
