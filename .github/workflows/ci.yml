@@ -20,7 +20,7 @@ jobs:
         shell: bash
         run: |
           source /opt/ros/${{ matrix.distro }}/setup.bash
-          mkdir -p ws/src && cp -r . ws/src/nav2_doctor && cd ws
+          mkdir -p /tmp/ws/src && cp -r "$GITHUB_WORKSPACE" /tmp/ws/src/nav2_doctor && cd /tmp/ws
           colcon build --packages-select nav2_doctor
           source install/setup.bash && ros2 run nav2_doctor nav2_doctor --version
-          cd src/nav2_doctor && python3 -m pytest -q test
+          cd src/nav2_doctor && (python3 -m pytest --version >/dev/null 2>&1 || apt-get update -qq && apt-get install -y -qq python3-pytest) && python3 -m pytest -q test
