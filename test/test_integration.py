@@ -26,7 +26,7 @@ _domain = [140]
 
 class FakeNav2(Node):
     """cfg keys: ns, stop_odom_tf/stop_all_tf/stop_odom/stop_scan (seconds), inactive (node name),
-    goal ('none'|'executing'|'flap'), cmd ('zero'|'move')"""
+    goal ('none'|'executing'|'flap'|'sequence'), cmd ('zero'|'move')"""
 
     def __init__(self, cfg):
         super().__init__('fake_nav2')
@@ -77,12 +77,18 @@ class FakeNav2(Node):
         mode = self.cfg.get('goal', 'none')
         if mode == 'none':
             return
-        s = GoalStatus()
-        s.status = GoalStatus.STATUS_EXECUTING
+        def mk(uid, status):
+            s = GoalStatus()
+            s.status = status
+            s.goal_info.goal_id.uuid = [uid % 256] + [0] * 15
+            return s
         self.n += 1
-        uid = self.n if mode == 'flap' else 1
-        s.goal_info.goal_id.uuid = [uid % 256] + [0] * 15
-        self.st_pub.publish(GoalStatusArray(status_list=[s]))
+        if mode == 'executing':
+            lst = [mk(1, GoalStatus.STATUS_EXECUTING)]
+        else:   # 'flap': previous goal CANCELED; 'sequence': previous goal SUCCEEDED (normal exploring)
+            end = GoalStatus.STATUS_CANCELED if mode == 'flap' else GoalStatus.STATUS_SUCCEEDED
+            lst = [mk(self.n - 1, end), mk(self.n, GoalStatus.STATUS_EXECUTING)] if self.n > 1 else [mk(self.n, GoalStatus.STATUS_EXECUTING)]
+        self.st_pub.publish(GoalStatusArray(status_list=lst))
 
 
 def run(cfg, args=(), secs=8):
@@ -138,6 +144,11 @@ def test_inactive_node():
 def test_goal_flapping():
     codes, rc, out = run({'goal': 'flap', 'cmd': 'move'})
     assert 'GOAL_FLAPPING' in codes, out
+
+
+def test_normal_exploring_is_not_flapping():
+    codes, rc, out = run({'goal': 'sequence', 'cmd': 'move'})
+    assert 'GOAL_FLAPPING' not in codes and 'HEALTHY' in codes and rc == 0, out
 
 
 def test_cmd_zero_during_goal():

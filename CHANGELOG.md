@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.1
+- Goal flapping now counts goals CANCELED/ABORTED before finishing. Before, a healthy explorer that sent a new goal after each success was flagged.
+
 ## 0.2.0
 - `--startup-grace` flag; `--once` exits 1 when errors are found (usable in CI/scripts).
 - 28 unit tests and 12 integration tests that run the real CLI against a fake Nav2 graph.
