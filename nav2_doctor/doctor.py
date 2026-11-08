@@ -7,7 +7,7 @@ import argparse
 import time
 from dataclasses import dataclass
 
-__version__ = '0.1.1'
+__version__ = '0.2.0'
 
 NAV2_NODES = ['controller_server', 'planner_server', 'bt_navigator',
               'behavior_server', 'smoother_server', 'waypoint_follower']
@@ -27,7 +27,8 @@ class Finding:
 class Doctor:
     """Feed it events with `seen()` / `state()`; ask `diagnose(now)`."""
 
-    def __init__(self):
+    def __init__(self, startup_s=STARTUP_S):
+        self.startup_s = startup_s
         self.last = {}           # stream name -> last receipt time
         self.tf_edges = {}       # (parent, child) -> last receipt time
         self.lifecycle = {}      # node -> state label or None (unreachable)
@@ -99,7 +100,7 @@ class Doctor:
             if st is None:
                 f.append(Finding('WARN', 'NODE_MISSING', f'{n}: lifecycle service unreachable (not launched?)'))
             elif st != 'active':
-                if self.started is not None and now - self.started < STARTUP_S:
+                if self.started is not None and now - self.started < self.startup_s:
                     f.append(Finding('WARN', 'NODE_STARTING', f'{n} is "{st}" - Nav2 may still be starting up'))
                 else:
                     f.append(Finding('ERROR', 'NODE_INACTIVE', f'{n} is "{st}", not active - lifecycle manager stuck'))
@@ -141,12 +142,14 @@ def main(argv=None):
     ap.add_argument('--version', action='version', version=f'nav2_doctor {__version__}')
     ap.add_argument('--ns', default='', help='robot namespace, e.g. robot1')
     ap.add_argument('--period', type=float, default=2.0, help='report period (s)')
+    ap.add_argument('--startup-grace', type=float, default=STARTUP_S,
+                    help='seconds before inactive lifecycle nodes count as errors')
     ap.add_argument('--once', type=float, default=0.0, help='watch N seconds, print one report, exit')
     args, ros_args = ap.parse_known_args(argv)
 
     rclpy.init(args=ros_args)
     node = Node('nav2_doctor')
-    d = Doctor()
+    d = Doctor(args.startup_grace)
     ns = ('/' + args.ns.strip('/')) if args.ns else ''
     clock = time.monotonic
     sd = qos_profile_sensor_data
@@ -188,14 +191,18 @@ def main(argv=None):
             fut.add_done_callback(lambda f, n=n: d.lifecycle.__setitem__(n, f.result().current_state.label))
     node.create_timer(3.0, poll_lifecycle)
 
+    exit_code = [0]
+
     def report():
+        found = d.diagnose(clock())
         print(f'\n--- nav2_doctor {time.strftime("%H:%M:%S")} ns="{args.ns}" ---')
-        print(fmt(d.diagnose(clock())), flush=True)
+        print(fmt(found), flush=True)
+        return found
     start = clock()
 
     def tick():
         if args.once and clock() - start >= args.once:
-            report()
+            exit_code[0] = 1 if any(x.level == 'ERROR' for x in report()) else 0
             raise SystemExit
         if not args.once:
             report()
@@ -208,7 +215,8 @@ def main(argv=None):
         pass
     node.destroy_node()
     rclpy.try_shutdown()
+    return exit_code[0]
 
 
 if __name__ == '__main__':
-    main()
+    raise SystemExit(main())

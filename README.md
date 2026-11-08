@@ -25,4 +25,4 @@ WARN  [GOAL_FLAPPING] 5 new goals in 30s - explorer/goal source is oscillating (
 
 When Nav2 sits still, the cause is usually one of a handful of things, and finding it means juggling `ros2 topic hz`, `tf2_echo`, `ros2 lifecycle get` and the logs. nav2_doctor runs those checks together and prints a one-line cause. It is read-only, needs no rebuild, and works on any Nav2 stack.
 
-Build: `colcon build --packages-select nav2_doctor`. Tests: `python3 -m pytest test`.
+Build: `colcon build --packages-select nav2_doctor`. Tests: `python3 -m pytest test` (unit; integration runs too when ROS 2 is sourced). `--once N` exits 1 on errors.
