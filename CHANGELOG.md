@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.0
 - `--ns robotN` now also reads the shared global `/tf` (keeping only `robotN/...` frames), so multi-robot stacks that remap every robot's TF onto one `/tf` no longer report `TF_NONE`.
 - `RECOVERY_LOOP` no longer counts control/wrapper nodes (`NavigateRecovery`, `RecoveryActions`, fallbacks) — they go RUNNING on every normal navigation and made the check fire constantly.
 - New `SCAN_TF_AHEAD` warning: scan stamps are >0.5 s ahead of the newest odom->base_link TF, so lookups at the scan time fail with "extrapolation into the future".

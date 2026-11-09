@@ -26,4 +26,4 @@ Ideas from surveying similar tools (Nav2 Ready, TopicForge diagnose-nav2, EasyNa
 - [ ] Rotating in place counts as "no progress" today; consider yaw change as movement
 - [x] Tag and release 0.3.0 (0.4.0 released since)
 - [x] `IDLE_NO_GOALS`, `MAP_STALL`, `SCAN_TF_AHEAD` checks (unreleased)
-- [ ] Cut a release with the three new checks + `RECOVERY_LOOP` fix
+- [x] Cut a release with the three new checks + `RECOVERY_LOOP` fix (0.5.0)

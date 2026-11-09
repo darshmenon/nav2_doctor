@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="3">
   <name>nav2_doctor</name>
-  <version>0.4.0</version>
+  <version>0.5.0</version>
   <description>Attach to a running Nav2 stack and say why the robot is not moving.</description>
   <maintainer email="darshmenon02@gmail.com">darshmenon</maintainer>
   <license>Apache-2.0</license>
