@@ -398,3 +398,20 @@ def test_scan_tf_small_lead_ok():
     d.tf('map', 'odom', 1.0); d.tf('odom', 'base_link', 1.0); d.seen('scan', 1.0)
     d.stamps(scan=20.008, tf=20.0)
     assert 'SCAN_TF_AHEAD' not in codes(d, 1.0)
+
+
+def test_recovery_ignores_control_nodes():
+    d = healthy()
+    for i, n in enumerate(['NavigateRecovery', 'FollowPathRecovery', 'RecoveryActions', 'RecoveryFallback',
+                           'ComputePathRecovery', 'ExploreNavigateRecovery']):
+        d.recovery(n, 1.0 + i)
+    d.tf('map', 'odom', 7.0); d.tf('odom', 'base_link', 7.0); d.seen('scan', 7.0)
+    assert 'RECOVERY_LOOP' not in codes(d, 7.0)
+
+
+def test_recovery_counts_real_behaviours():
+    d = healthy()
+    for i, n in enumerate(['Spin', 'BackUp', 'Wait', 'local_costmap/clear_entirely_local_costmap']):
+        d.recovery(n, 1.0 + i)
+    d.tf('map', 'odom', 6.0); d.tf('odom', 'base_link', 6.0); d.seen('scan', 6.0)
+    assert 'RECOVERY_LOOP' in codes(d, 6.0)

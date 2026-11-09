@@ -57,7 +57,9 @@ HINTS = {
 }
 
 
-RECOVERY_WORDS = ('spin', 'backup', 'back_up', 'wait', 'clearentire', 'clear_entire', 'recovery')
+RECOVERY_WORDS = ('spin', 'backup', 'back_up', 'wait', 'clearentire', 'clear_entire')
+# control/wrapper nodes (RecoveryNode, Fallback, ...) go RUNNING on every normal navigation - not a recovery
+RECOVERY_IGNORE = ('recovery', 'fallback', 'actions', 'sequence', 'retry')
 RECOVERY_COUNT = 3     # recovery behaviours started inside the window => RECOVERY_LOOP
 RECOVERY_WINDOW_S = 60.0
 
@@ -157,7 +159,8 @@ class Doctor:
         self.map_hist = [m for m in self.map_hist if now - m[0] <= MAP_WIN_S * 2]
 
     def recovery(self, node_name, now):
-        if any(w in node_name.lower() for w in RECOVERY_WORDS):
+        n = node_name.lower()
+        if any(w in n for w in RECOVERY_WORDS) and not any(w in n for w in RECOVERY_IGNORE):
             self.recoveries.append(now)
             self.recoveries = [t for t in self.recoveries if now - t <= RECOVERY_WINDOW_S]
 
