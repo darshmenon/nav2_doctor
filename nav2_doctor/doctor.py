@@ -323,6 +323,12 @@ class Doctor:
         return f
 
 
+def tf_belongs_to(ns, parent, child):
+    """True if a transform on the shared /tf touches robot `ns` (frames prefixed `ns/`)."""
+    pre = ns.strip('/') + '/'
+    return parent.lstrip('/').startswith(pre) or child.lstrip('/').startswith(pre)
+
+
 def fmt(findings, hints=False):
     icon = {'ERROR': '\033[31mERROR\033[0m', 'WARN': '\033[33mWARN \033[0m', 'OK': '\033[32mOK   \033[0m'}
     out = []
@@ -393,8 +399,12 @@ def main(argv=None):
     sd = qos_profile_sensor_data
     rel = QoSProfile(depth=100)
 
-    def on_tf(m):
+    def on_tf(m, shared=False):
         for t in m.transforms:
+            # Stacks that remap every robot's TF onto one global /tf use frame prefixes (robot1/odom ...):
+            # on that shared topic keep only this robot's frames.
+            if shared and not tf_belongs_to(args.ns, t.header.frame_id, t.child_frame_id):
+                continue
             st = t.header.stamp
             skew = None
             if st.sec or st.nanosec:   # zero stamp = unstamped, nothing to compare
@@ -404,6 +414,8 @@ def main(argv=None):
                     and (st.sec or st.nanosec):
                 d.stamps(tf=st.sec + st.nanosec / 1e9)
     node.create_subscription(TFMessage, f'{ns}/tf', on_tf, rel)
+    if ns:   # shared global /tf with frame prefixes (multi-robot): see on_tf
+        node.create_subscription(TFMessage, '/tf', lambda m: on_tf(m, True), rel)
     node.create_subscription(Odometry, f'{ns}/odom', lambda m: d.pose(m.pose.pose.position.x, m.pose.pose.position.y, clock()), sd)
     node.create_subscription(PoseWithCovarianceStamped, f'{ns}/amcl_pose',
                              lambda m: d.amcl(m.pose.covariance[0], m.pose.covariance[7], clock()), rel)

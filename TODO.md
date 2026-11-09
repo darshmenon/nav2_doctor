@@ -18,9 +18,11 @@ Ideas from surveying similar tools (Nav2 Ready, TopicForge diagnose-nav2, EasyNa
 ## Next up
 - [x] `NO_PROGRESS`: goal active but odometry shows no movement
 - [x] Tunable thresholds (`--stale`, `--flap-count`, `--flap-window`, `--progress-time`, `--progress-dist`)
-- [ ] Run the integration tests (`test/test_integration.py`) in CI against the new flags and `NO_PROGRESS`; they are slow locally
+- [x] Run the integration tests (`test/test_integration.py`) in CI against the new flags and `NO_PROGRESS`; they are slow locally
 - [ ] Integration test for `--json` output and `--diagnostics`
-- [ ] Repeating recovery behaviours check (spin/backup/wait loops)
+- [x] Repeating recovery behaviours check (spin/backup/wait loops) — `RECOVERY_LOOP`, wrapper nodes ignored
 - [x] AMCL covariance too high (`AMCL_UNCERTAIN`)
 - [ ] Rotating in place counts as "no progress" today; consider yaw change as movement
-- [ ] Tag and release 0.3.0 once CI is green
+- [x] Tag and release 0.3.0 (0.4.0 released since)
+- [x] `IDLE_NO_GOALS`, `MAP_STALL`, `SCAN_TF_AHEAD` checks (unreleased)
+- [ ] Cut a release with the three new checks + `RECOVERY_LOOP` fix

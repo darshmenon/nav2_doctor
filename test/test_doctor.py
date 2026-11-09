@@ -415,3 +415,11 @@ def test_recovery_counts_real_behaviours():
         d.recovery(n, 1.0 + i)
     d.tf('map', 'odom', 6.0); d.tf('odom', 'base_link', 6.0); d.seen('scan', 6.0)
     assert 'RECOVERY_LOOP' in codes(d, 6.0)
+
+
+def test_tf_belongs_to_namespace_prefix():
+    from nav2_doctor.doctor import tf_belongs_to
+    assert tf_belongs_to('robot1', 'map', 'robot1/odom')
+    assert tf_belongs_to('/robot1', 'robot1/odom', 'robot1/base_link')
+    assert not tf_belongs_to('robot1', 'map', 'robot2/odom')
+    assert not tf_belongs_to('robot1', 'robot10/odom', 'robot10/base_link')
