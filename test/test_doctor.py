@@ -328,3 +328,73 @@ def test_readiness_verdict():
     v = readiness_verdict([Finding('WARN', 'RECOVERY_LOOP', 'y')])
     assert 'READY' in v and 'NOT' not in v and 'RECOVERY_LOOP' in v
     assert 'READY' in readiness_verdict([Finding('OK', 'HEALTHY', 'ok')])
+
+
+def _idle(d, upto, cmd=False, goal=False):
+    for i in range(0, int(upto * 2)):
+        t = i * 0.5
+        d.tf('map', 'odom', t); d.tf('odom', 'base_link', t); d.seen('scan', t); d.pose(0.0, 0.0, t)
+        if cmd:
+            d.cmd(0.2, 0, t)
+        if goal:
+            d.set_goal_active(True, t)
+
+
+def test_idle_no_goals_flagged():
+    d = healthy()
+    _idle(d, 70)
+    assert 'IDLE_NO_GOALS' in codes(d, 70)
+
+
+def test_idle_no_goals_not_before_grace():
+    d = healthy()
+    _idle(d, 20)
+    assert 'IDLE_NO_GOALS' not in codes(d, 20)
+
+
+def test_idle_no_goals_cleared_by_goal_or_motion():
+    d = healthy(); _idle(d, 70, goal=True)
+    assert 'IDLE_NO_GOALS' not in codes(d, 70)
+    d = healthy(); _idle(d, 70, cmd=True)
+    assert 'IDLE_NO_GOALS' not in codes(d, 70)
+
+
+def _map_run(free_at, secs=70, cmd=True):
+    d = healthy()
+    for i in range(0, secs * 2):
+        t = i * 0.5
+        d.tf('map', 'odom', t); d.tf('odom', 'base_link', t); d.seen('scan', t); d.pose(0.0, 0.0, t)
+        if cmd:
+            d.cmd(0.0, 0.5, t)
+        if i % 4 == 0:
+            d.map_msg(free_at(t), t)
+    return d
+
+
+def test_map_stall_flagged_when_map_frozen_while_driving():
+    d = _map_run(lambda t: 1319)
+    assert 'MAP_STALL' in codes(d, 69.5)
+
+
+def test_map_stall_not_flagged_when_map_grows():
+    d = _map_run(lambda t: 1319 + int(t * 200))
+    assert 'MAP_STALL' not in codes(d, 69.5)
+
+
+def test_map_stall_not_flagged_when_robot_idle():
+    d = _map_run(lambda t: 1319, cmd=False)
+    assert 'MAP_STALL' not in codes(d, 69.5)
+
+
+def test_scan_tf_ahead_flagged():
+    d = healthy()
+    d.tf('map', 'odom', 1.0); d.tf('odom', 'base_link', 1.0); d.seen('scan', 1.0)
+    d.stamps(scan=20.0, tf=18.8)
+    assert 'SCAN_TF_AHEAD' in codes(d, 1.0)
+
+
+def test_scan_tf_small_lead_ok():
+    d = healthy()
+    d.tf('map', 'odom', 1.0); d.tf('odom', 'base_link', 1.0); d.seen('scan', 1.0)
+    d.stamps(scan=20.008, tf=20.0)
+    assert 'SCAN_TF_AHEAD' not in codes(d, 1.0)
