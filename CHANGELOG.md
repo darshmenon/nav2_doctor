@@ -6,6 +6,7 @@
 - New `SCAN_TF_AHEAD` warning: scan stamps are >0.5 s ahead of the newest odom->base_link TF, so lookups at the scan time fail with "extrapolation into the future".
 - New `MAP_STALL` warning: robot commanded to move for 10 s+ in the last minute but `/map` free cells did not grow — SLAM is not integrating scans.
 - New `IDLE_NO_GOALS` warning: stack alive 45 s+, no goal ever sent and the robot never commanded — the goal source (e.g. an explorer) probably quit early.
+- `--ns robotN` now reads `/tf_static` too: a fixed `map->robotN/odom` (static localization mode) counts as present and is never reported stale, so `NO_MAP_ODOM` no longer fires for those robots.
 
 ## 0.4.0
 - `--ready [SECS]`: pre-flight mode. Watches SECS (default 10), prints hints and a `READY` / `NOT READY` verdict, exits 1 on any blocking ERROR.

@@ -13,6 +13,7 @@ Ideas from surveying similar tools (Nav2 Ready, TopicForge diagnose-nav2, EasyNa
 - [x] Footprint-polygon inscribed radius
 - [x] `/initialpose`: covered by the `NO_MAP_ODOM` hint
 - [x] `RECOVERY_LOOP` from `/behavior_tree_log`
+- [x] `/tf_static` read for static map->odom (NO_MAP_ODOM false positive)
 - [ ] Namespaced `/diagnostics` topic
 
 ## Next up

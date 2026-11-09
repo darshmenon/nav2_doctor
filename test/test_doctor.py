@@ -91,6 +91,14 @@ def test_missing_map_odom_warns():
     assert 'NO_MAP_ODOM' in codes(d, 0.5)
 
 
+def test_static_map_odom_counts_and_is_never_stale():
+    # explore_localization:=static publishes map->odom once on /tf_static
+    d = Doctor(); d.tf_static('map', 'robot2/odom'); d.tf('robot2/odom', 'robot2/base_link', 0.0)
+    assert 'NO_MAP_ODOM' not in codes(d, 0.5)
+    d.tf('robot2/odom', 'robot2/base_link', 99.0)
+    assert 'NO_MAP_ODOM' not in codes(d, 100.0) and 'TF_EDGE_STALE' not in codes(d, 100.0)
+
+
 def test_stale_boundary():
     d = healthy()
     assert 'TF_FREEZE' not in codes(d, STALE_S - 0.01)
