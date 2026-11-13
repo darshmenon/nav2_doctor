@@ -54,14 +54,13 @@ When Nav2 sits still, finding the cause means juggling `ros2 topic hz`, `tf2_ech
 
 ## Limits
 
-- Thresholds are tunable with `--stale`, `--flap-count`, `--flap-window`, `--progress-time`, `--progress-dist`.
+- Thresholds are tunable with `--stale`, `--flap-count`, `--flap-window`, `--progress-time`, `--progress-dist`, `--progress-yaw` (turning in place counts as movement).
 - The costmap check needs `/local_costmap/costmap`; the goal checks need `navigate_to_pose`.
 - One robot per run; use `--ns` once per robot.
-- Reports to the terminal (text or `--json`); no `/diagnostics` output yet.
+- Reports to the terminal (text or `--json`); `--diagnostics` also publishes a `DiagnosticArray` on `/diagnostics` (`/<ns>/diagnostics` with `--ns`).
 
 ## Roadmap
 
-- a `/diagnostics` publisher
 - repeating recovery behaviours; AMCL covariance too high
 - inert costmap filters and a map-distortion check (`map->odom` yaw ramp)
 - multi-robot auto-discovery; ERROR lines from `/rosout` tied to the cause

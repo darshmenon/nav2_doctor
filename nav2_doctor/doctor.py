@@ -5,6 +5,7 @@ Pure-logic `Doctor` (no ROS imports, unit-testable) + a thin rclpy `main()`.
 """
 import argparse
 import json
+import math
 import time
 from dataclasses import dataclass
 
@@ -19,6 +20,7 @@ FLAP_COUNT = 4         # goals cancelled/aborted inside the window => flapping
 PROGRESS_S = 15.0      # goal active this long with no movement => NO_PROGRESS
 AMCL_COV_MAX = 0.5     # AMCL x/y covariance (m^2) above which localisation is uncertain
 PROGRESS_M = 0.1       # minimum displacement (m) that counts as movement
+PROGRESS_YAW = 0.2     # minimum heading change (rad) that counts as movement (rotating in place)
 MAP_WIN_S = 60.0       # window for MAP_STALL
 MAP_ACTIVE_S = 10.0    # seconds of non-zero cmd_vel in the window before an unchanged map is suspicious
 SCAN_LEAD_S = 0.5      # scan stamps this far ahead of the newest odom TF => SCAN_TF_AHEAD
@@ -94,14 +96,15 @@ class Doctor:
     """Feed it events with `seen()` / `state()`; ask `diagnose(now)`."""
 
     def __init__(self, startup_s=STARTUP_S, stale_s=STALE_S, flap_window_s=FLAP_WINDOW_S,
-                 flap_count=FLAP_COUNT, progress_s=PROGRESS_S, progress_m=PROGRESS_M):
+                 flap_count=FLAP_COUNT, progress_s=PROGRESS_S, progress_m=PROGRESS_M, progress_yaw=PROGRESS_YAW):
         self.startup_s = startup_s
         self.stale_s = stale_s
         self.flap_window_s = flap_window_s
         self.flap_count = flap_count
         self.progress_s = progress_s
         self.progress_m = progress_m
-        self.poses = []          # (time, x, y) odometry samples
+        self.progress_yaw = progress_yaw
+        self.poses = []          # (time, x, y, yaw) odometry samples; yaw is None when unknown
         self.goal_since = None   # when the current goal became active
         self.last = {}           # stream name -> last receipt time
         self.tf_edges = {}       # (parent, child) -> last receipt time
@@ -174,9 +177,9 @@ class Doctor:
         self.goal_times.append(now)
         self.goal_times = [t for t in self.goal_times if now - t <= self.flap_window_s]
 
-    def pose(self, x, y, now):
+    def pose(self, x, y, now, yaw=None):
         self.seen('odom', now)
-        self.poses.append((now, x, y))
+        self.poses.append((now, x, y, yaw))
         keep = max(self.progress_s, self.stale_s) * 2
         self.poses = [p for p in self.poses if now - p[0] <= keep]
 
@@ -190,6 +193,17 @@ class Doctor:
         self.goal_active = active
 
     # ---- helpers ------------------------------------------------------
+    def _moved(self, win):
+        """(metres, radians) the robot moved away from the first sample of the window."""
+        _, x0, y0, yaw0 = win[0]
+        metres = max(((x - x0) ** 2 + (y - y0) ** 2) ** 0.5 for _, x, y, _ in win)
+        rad = 0.0
+        if yaw0 is not None:
+            for _, _, _, yaw in win:
+                if yaw is not None:
+                    rad = max(rad, abs(math.atan2(math.sin(yaw - yaw0), math.cos(yaw - yaw0))))
+        return metres, rad
+
     def _age(self, stream, now):
         t = self.last.get(stream)
         return None if t is None else now - t
@@ -258,9 +272,8 @@ class Doctor:
         if self.goal_active and self.goal_since is not None and now - self.goal_since >= self.progress_s:
             win = [p for p in self.poses if now - p[0] <= self.progress_s]
             if len(win) >= 2 and win[0][0] - (now - self.progress_s) < self.stale_s:
-                x0, y0 = win[0][1:]
-                moved = max(((x - x0) ** 2 + (y - y0) ** 2) ** 0.5 for _, x, y in win)
-                if moved < self.progress_m:
+                moved, turned = self._moved(win)
+                if moved < self.progress_m and turned < self.progress_yaw:
                     f.append(Finding('WARN', 'NO_PROGRESS',
                                      f'goal active for {now - self.goal_since:.0f}s but robot moved only {moved:.2f}m in {self.progress_s:.0f}s - stuck, recovering, or blocked'))
 
@@ -274,9 +287,8 @@ class Doctor:
                 and self.last_cmd_nonzero is not None and now - self.last_cmd_nonzero < self.stale_s:
             win = [p for p in self.poses if now - p[0] <= DRIVE_S]
             if len(win) >= 2 and win[0][0] - (now - DRIVE_S) < self.stale_s:
-                x0, y0 = win[0][1:]
-                moved = max(((x - x0) ** 2 + (y - y0) ** 2) ** 0.5 for _, x, y in win)
-                if moved < self.progress_m:
+                moved, turned = self._moved(win)
+                if moved < self.progress_m and turned < self.progress_yaw:
                     f.append(Finding('ERROR', 'CMD_NO_MOTION',
                                      f'cmd_vel non-zero for {now - self.cmd_since:.0f}s but odom moved {moved:.2f}m - '
                                      'chassis/driver not obeying, e-stop, or odom frozen'))
@@ -358,6 +370,16 @@ def to_json(findings, ns, now_wall):
                        'findings': [dict(x.__dict__, hint=HINTS.get(x.code)) for x in findings]})
 
 
+def yaw_of(q):
+    """Heading (rad) from a geometry_msgs quaternion."""
+    return math.atan2(2.0 * (q.w * q.z + q.x * q.y), 1.0 - 2.0 * (q.y * q.y + q.z * q.z))
+
+
+def diagnostics_topic(ns):
+    """/diagnostics for a single robot, <ns>/diagnostics when --ns is given."""
+    return (('/' + ns.strip('/')) if ns else '') + '/diagnostics'
+
+
 def main(argv=None):
     import rclpy
     from rclpy.node import Node
@@ -383,10 +405,12 @@ def main(argv=None):
     ap.add_argument('--progress-time', type=float, default=PROGRESS_S,
                     help='seconds with an active goal and no movement before NO_PROGRESS')
     ap.add_argument('--progress-dist', type=float, default=PROGRESS_M, help='metres that count as movement')
+    ap.add_argument('--progress-yaw', type=float, default=PROGRESS_YAW,
+                    help='radians of heading change that count as movement (rotating in place) [0.2]')
     ap.add_argument('--json', action='store_true', help='print one JSON object per report')
     ap.add_argument('--hints', action='store_true', help='print a suggested next step under each finding')
     ap.add_argument('--diagnostics', action='store_true',
-                    help='also publish findings as diagnostic_msgs/DiagnosticArray on /diagnostics')
+                    help='also publish findings as diagnostic_msgs/DiagnosticArray on /diagnostics (<ns>/diagnostics with --ns)')
     ap.add_argument('--once', type=float, default=0.0, help='watch N seconds, print one report, exit')
     ap.add_argument('--ready', nargs='?', type=float, const=10.0, default=None, metavar='SECS',
                     help='pre-flight: watch SECS (default 10), print hints and a READY / NOT READY verdict; '
@@ -398,7 +422,7 @@ def main(argv=None):
     rclpy.init(args=ros_args)
     node = Node('nav2_doctor')
     d = Doctor(args.startup_grace, args.stale, args.flap_window, args.flap_count,
-               args.progress_time, args.progress_dist)
+               args.progress_time, args.progress_dist, args.progress_yaw)
     ns = ('/' + args.ns.strip('/')) if args.ns else ''
     clock = time.monotonic
     sd = qos_profile_sensor_data
@@ -431,7 +455,7 @@ def main(argv=None):
     node.create_subscription(TFMessage, f'{ns}/tf_static', on_tf_static, latched)
     if ns:
         node.create_subscription(TFMessage, '/tf_static', lambda m: on_tf_static(m, True), latched)
-    node.create_subscription(Odometry, f'{ns}/odom', lambda m: d.pose(m.pose.pose.position.x, m.pose.pose.position.y, clock()), sd)
+    node.create_subscription(Odometry, f'{ns}/odom', lambda m: d.pose(m.pose.pose.position.x, m.pose.pose.position.y, clock(), yaw_of(m.pose.pose.orientation)), sd)
     node.create_subscription(PoseWithCovarianceStamped, f'{ns}/amcl_pose',
                              lambda m: d.amcl(m.pose.covariance[0], m.pose.covariance[7], clock()), rel)
     node.create_subscription(LaserScan, f'{ns}/scan', lambda m: (d.seen('scan', clock()), d.stamps(scan=m.header.stamp.sec + m.header.stamp.nanosec / 1e9)), sd)
@@ -510,7 +534,7 @@ def main(argv=None):
         param_cli.call_async(req).add_done_callback(done)
     node.create_timer(10.0, poll_params)
 
-    diag_pub = node.create_publisher(DiagnosticArray, '/diagnostics', 10) if args.diagnostics else None
+    diag_pub = node.create_publisher(DiagnosticArray, diagnostics_topic(args.ns), 10) if args.diagnostics else None
     lvl = {'OK': DiagnosticStatus.OK, 'WARN': DiagnosticStatus.WARN, 'ERROR': DiagnosticStatus.ERROR}
 
     def publish_diag(found):

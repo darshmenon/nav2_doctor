@@ -431,3 +431,71 @@ def test_tf_belongs_to_namespace_prefix():
     assert tf_belongs_to('/robot1', 'robot1/odom', 'robot1/base_link')
     assert not tf_belongs_to('robot1', 'map', 'robot2/odom')
     assert not tf_belongs_to('robot1', 'robot10/odom', 'robot10/base_link')
+
+
+def _rotation_run(yaw_per_s, goal=True, cmd=False):
+    d = Doctor()
+    if goal:
+        d.set_goal_active(True, 0.0)
+    for i in range(0, 31):
+        if cmd:
+            d.cmd(0.0, 0.5, float(i))
+        d.pose(0.0, 0.0, float(i), yaw=yaw_per_s * i)
+    return d
+
+
+def test_rotating_in_place_is_not_no_progress():
+    assert 'NO_PROGRESS' not in [x.code for x in _rotation_run(0.3).diagnose(30.0)]
+
+
+def test_unknown_yaw_keeps_the_old_behaviour():
+    d = Doctor()
+    d.set_goal_active(True, 0.0)
+    for i in range(0, 31):
+        d.pose(0.0, 0.0, float(i))          # no yaw given
+    assert 'NO_PROGRESS' in [x.code for x in d.diagnose(30.0)]
+
+
+def test_tiny_yaw_jitter_is_still_no_progress():
+    d = Doctor()
+    d.set_goal_active(True, 0.0)
+    for i in range(0, 31):
+        d.pose(0.0, 0.0, float(i), yaw=0.01 * (i % 2))
+    assert 'NO_PROGRESS' in [x.code for x in d.diagnose(30.0)]
+
+
+def test_yaw_threshold_is_tunable():
+    d = Doctor(progress_yaw=1.0)
+    d.set_goal_active(True, 0.0)
+    for i in range(0, 31):
+        d.pose(0.0, 0.0, float(i), yaw=0.01 * i)     # 0.3 rad over the window: below 1.0
+    assert 'NO_PROGRESS' in [x.code for x in d.diagnose(30.0)]
+
+
+def test_yaw_wraps_around_pi():
+    import math
+    d = Doctor()
+    d.set_goal_active(True, 0.0)
+    for i in range(0, 31):
+        d.pose(0.0, 0.0, float(i), yaw=math.pi - 0.005 + 0.01 * (i % 2))   # crosses +-pi, tiny real change
+    assert 'NO_PROGRESS' in [x.code for x in d.diagnose(30.0)]
+
+
+def test_spinning_with_cmd_vel_is_not_cmd_no_motion():
+    d = _rotation_run(0.3, goal=False, cmd=True)
+    assert 'CMD_NO_MOTION' not in [x.code for x in d.diagnose(30.0)]
+    still = Doctor()
+    for i in range(0, 31):
+        still.cmd(0.0, 0.5, float(i)); still.pose(0.0, 0.0, float(i), yaw=0.0)
+    assert 'CMD_NO_MOTION' in [x.code for x in still.diagnose(30.0)]
+
+
+def test_diagnostics_topic_and_yaw_helpers():
+    from types import SimpleNamespace as NS
+    from nav2_doctor.doctor import diagnostics_topic, yaw_of
+    assert diagnostics_topic('') == '/diagnostics'
+    assert diagnostics_topic('robot1') == '/robot1/diagnostics'
+    assert diagnostics_topic('/robot1/') == '/robot1/diagnostics'
+    import math
+    q = NS(x=0.0, y=0.0, z=math.sin(0.4), w=math.cos(0.4))
+    assert abs(yaw_of(q) - 0.8) < 1e-9

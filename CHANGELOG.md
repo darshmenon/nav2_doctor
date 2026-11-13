@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.0
+- Rotating in place now counts as movement: `NO_PROGRESS` and `CMD_NO_MOTION` no longer fire while the robot turns at least `--progress-yaw` radians (default 0.2) in the window. Odometry without orientation behaves as before.
+- `--diagnostics` with `--ns robotN` publishes on `/robotN/diagnostics` instead of the global `/diagnostics`.
+- Integration tests for `--json` output, `--diagnostics` (global and namespaced) and in-place rotation.
+
 ## 0.5.0
 - `--ns robotN` now also reads the shared global `/tf` (keeping only `robotN/...` frames), so multi-robot stacks that remap every robot's TF onto one `/tf` no longer report `TF_NONE`.
 - `RECOVERY_LOOP` no longer counts control/wrapper nodes (`NavigateRecovery`, `RecoveryActions`, fallbacks) — they go RUNNING on every normal navigation and made the check fire constantly.
