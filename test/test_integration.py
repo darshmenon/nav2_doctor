@@ -16,12 +16,17 @@ from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus  # noqa: E402
 from geometry_msgs.msg import Twist, TransformStamped  # noqa: E402
 from lifecycle_msgs.srv import GetState  # noqa: E402
 from nav_msgs.msg import Odometry, OccupancyGrid  # noqa: E402
-from nav2_msgs.msg import CostmapFilterInfo  # noqa: E402
 from rclpy.qos import DurabilityPolicy, QoSProfile  # noqa: E402
 from rclpy.executors import SingleThreadedExecutor  # noqa: E402
 from rclpy.node import Node  # noqa: E402
 from sensor_msgs.msg import LaserScan  # noqa: E402
 from tf2_msgs.msg import TFMessage  # noqa: E402
+
+try:    # nav2_msgs is not in ros-base (CI image); only the costmap filter tests need it
+    from nav2_msgs.msg import CostmapFilterInfo
+except ImportError:
+    CostmapFilterInfo = None
+needs_nav2_msgs = pytest.mark.skipif(CostmapFilterInfo is None, reason='nav2_msgs not installed')
 
 ROOT = os.path.join(os.path.dirname(__file__), '..')
 NODES = ['controller_server', 'planner_server', 'bt_navigator',
@@ -264,11 +269,13 @@ def test_diagnostics_carry_error_levels():
     assert any(x.name == 'nav2_doctor/SCAN_STALE' and x.level == DiagnosticStatus.ERROR for x in st)
 
 
+@needs_nav2_msgs
 def test_filter_without_mask_publisher_is_flagged():
     codes, rc, out = run({'cmd': 'move', 'filter': 'no_mask'})
     assert 'FILTER_NO_MASK' in codes, out
 
 
+@needs_nav2_msgs
 def test_filter_with_mask_is_fine():
     codes, rc, out = run({'cmd': 'move', 'filter': 'ok'})
     assert 'FILTER_NO_MASK' not in codes and 'HEALTHY' in codes, out
