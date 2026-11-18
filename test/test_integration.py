@@ -15,7 +15,9 @@ from action_msgs.msg import GoalStatus, GoalStatusArray  # noqa: E402
 from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus  # noqa: E402
 from geometry_msgs.msg import Twist, TransformStamped  # noqa: E402
 from lifecycle_msgs.srv import GetState  # noqa: E402
-from nav_msgs.msg import Odometry  # noqa: E402
+from nav_msgs.msg import Odometry, OccupancyGrid  # noqa: E402
+from nav2_msgs.msg import CostmapFilterInfo  # noqa: E402
+from rclpy.qos import DurabilityPolicy, QoSProfile  # noqa: E402
 from rclpy.executors import SingleThreadedExecutor  # noqa: E402
 from rclpy.node import Node  # noqa: E402
 from sensor_msgs.msg import LaserScan  # noqa: E402
@@ -45,6 +47,13 @@ class FakeNav2(Node):
         self.st_pub = self.create_publisher(GoalStatusArray, f'{ns}/navigate_to_pose/_action/status', 10)
         for n in NODES:
             self.create_service(GetState, f'{ns}/{n}/get_state', lambda rq, rs, n=n: self._state(n, rs))
+        if cfg.get('filter'):   # 'no_mask': filter info only; 'ok': info and the (latched) mask
+            latched = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
+            self.info_pub = self.create_publisher(CostmapFilterInfo, f'{ns}/costmap_filter_info', latched)
+            self.info_pub.publish(CostmapFilterInfo(filter_mask_topic=f'{ns}/keepout_mask'))
+            if cfg['filter'] == 'ok':
+                self.mask_pub = self.create_publisher(OccupancyGrid, f'{ns}/keepout_mask', latched)
+                self.mask_pub.publish(OccupancyGrid())
         self.diag = {}
         for topic in cfg.get('diag_topics', []):
             self.diag[topic] = []
@@ -253,3 +262,13 @@ def test_diagnostics_carry_error_levels():
     run({'stop_scan': 3, 'diag_topics': ['/diagnostics']}, args=('--diagnostics',), secs=8)
     st = run.diag['/diagnostics'][-1].status
     assert any(x.name == 'nav2_doctor/SCAN_STALE' and x.level == DiagnosticStatus.ERROR for x in st)
+
+
+def test_filter_without_mask_publisher_is_flagged():
+    codes, rc, out = run({'cmd': 'move', 'filter': 'no_mask'})
+    assert 'FILTER_NO_MASK' in codes, out
+
+
+def test_filter_with_mask_is_fine():
+    codes, rc, out = run({'cmd': 'move', 'filter': 'ok'})
+    assert 'FILTER_NO_MASK' not in codes and 'HEALTHY' in codes, out

@@ -55,6 +55,8 @@ HINTS = {
     'CLOCK_SKEW': 'sync clocks (chrony) or set use_sim_time consistently on every node',
     'INFLATION_SMALL': 'raise inflation_layer.inflation_radius above robot_radius (or footprint circumradius)',
     'RECOVERY_LOOP': 'find what keeps failing planning/control: read planner/controller logs, check costmap for phantom obstacles, loosen goal tolerance',
+    'FILTER_NO_MASK': 'start nav2_map_server for the filter mask (and make it active in the lifecycle manager); `ros2 topic info <mask topic> -v` shows the publisher',
+    'FILTER_NO_INFO': 'start the costmap_filter_info_server (and add it to the lifecycle manager); the filter in the costmap `filters` list has nothing to read',
     'NO_NAV2_VISIBLE': 'match ROS_DOMAIN_ID, ROS_LOCALHOST_ONLY, RMW_IMPLEMENTATION and --ns with the robot',
 }
 
@@ -124,6 +126,11 @@ class Doctor:
         self.scan_stamp = None      # newest scan header stamp (s)
         self.tf_stamp = None        # newest odom->base TF header stamp (s)
         self.ever_goal = False      # a goal was ever active/cancelled/aborted
+        self.filter_infos = {}      # CostmapFilterInfo topic -> {'mask': mask topic, 'since': first seen}
+        self.filter_mask_seen = set()   # mask topics a message was received on
+        self.filter_pubs = {}       # mask topic -> number of publishers
+        self.filters_configured = []    # names in the costmap `filters` parameter
+        self.filter_info_pubs = None    # publishers on the CostmapFilterInfo topics (None = unknown)
         self.amcl_cov = None        # worst of AMCL x/y variance (m^2) from /amcl_pose
 
     # ---- inputs -------------------------------------------------------
@@ -144,6 +151,11 @@ class Doctor:
     def tf_static(self, parent, child):
         """A /tf_static edge (e.g. a fixed map->odom when localization is static): counts as present, never stale."""
         self.static_edges.add((parent.lstrip('/'), child.lstrip('/')))
+
+    def filter_info(self, info_topic, mask_topic, now):
+        """A costmap filter info message (nav2_msgs/CostmapFilterInfo): says which topic carries the filter mask."""
+        self.seen('filter_info', now)
+        self.filter_infos.setdefault(info_topic, {'mask': mask_topic, 'since': now})['mask'] = mask_topic
 
     def cmd(self, linear, angular, now):
         self.seen('cmd_vel', now)
@@ -329,6 +341,19 @@ class Doctor:
             f.append(Finding('WARN', 'RECOVERY_LOOP',
                              f'{len(self.recoveries)} recovery behaviours in {RECOVERY_WINDOW_S:.0f}s - robot is '
                              'spinning/backing up repeatedly instead of making progress'))
+
+        for info, fi in self.filter_infos.items():
+            mask = fi['mask']
+            if (mask and mask not in self.filter_mask_seen and self.filter_pubs.get(mask) == 0
+                    and now - fi['since'] >= self.startup_s):
+                f.append(Finding('WARN', 'FILTER_NO_MASK',
+                                 f'costmap filter {info} points at mask topic {mask} but nothing publishes it - '
+                                 'the filter is inert (keepout / speed zones are not applied)'))
+        if (self.filters_configured and not self.filter_infos and self.filter_info_pubs == 0
+                and self.started is not None and now - self.started >= self.startup_s):
+            f.append(Finding('WARN', 'FILTER_NO_INFO',
+                             f'costmap lists filters {self.filters_configured} but no CostmapFilterInfo is published - '
+                             'the filters are inert'))
 
         if self.lifecycle and all(v is None for v in self.lifecycle.values()) and not self.last:
             f.append(Finding('WARN', 'NO_NAV2_VISIBLE',
@@ -533,6 +558,49 @@ def main(argv=None):
                         d.params['robot_radius'] = r
         param_cli.call_async(req).add_done_callback(done)
     node.create_timer(10.0, poll_params)
+
+    # costmap filters (keepout, speed zones): find the CostmapFilterInfo topics, then check each mask has a publisher
+    filter_subs = {}
+    try:
+        from nav2_msgs.msg import CostmapFilterInfo
+    except ImportError:    # nav2_msgs not installed: skip the filter checks
+        CostmapFilterInfo = None
+
+    def discover_filters():
+        if CostmapFilterInfo is None:
+            return
+        info_topics = [t for t, types in node.get_topic_names_and_types() if 'nav2_msgs/msg/CostmapFilterInfo' in types]
+        d.filter_info_pubs = sum(len(node.get_publishers_info_by_topic(t)) for t in info_topics)
+        for t in info_topics:
+            if t not in filter_subs:
+                def on_info(m, t=t):
+                    mask = m.filter_mask_topic
+                    mask = mask if mask.startswith('/') or not mask else f'{ns}/{mask}'
+                    d.filter_info(t, mask, clock())
+                    if mask and mask not in filter_subs:
+                        filter_subs[mask] = node.create_subscription(
+                            OccupancyGrid, mask, lambda _m, mask=mask: d.filter_mask_seen.add(mask), mapq)
+                filter_subs[t] = node.create_subscription(CostmapFilterInfo, t, on_info, mapq)
+        for info in d.filter_infos.values():
+            if info['mask']:
+                d.filter_pubs[info['mask']] = len(node.get_publishers_info_by_topic(info['mask']))
+    node.create_timer(2.0, discover_filters)
+
+    fparam_cli = node.create_client(GetParameters, f'{ns}/local_costmap/local_costmap/get_parameters')
+
+    def poll_filters():
+        if not fparam_cli.service_is_ready():
+            return
+
+        def done(f):
+            try:
+                v = f.result().values[0]
+            except Exception:
+                return
+            if v.type == 9:        # PARAMETER_STRING_ARRAY
+                d.filters_configured = list(v.string_array_value)
+        fparam_cli.call_async(GetParameters.Request(names=['filters'])).add_done_callback(done)
+    node.create_timer(10.0, poll_filters)
 
     diag_pub = node.create_publisher(DiagnosticArray, diagnostics_topic(args.ns), 10) if args.diagnostics else None
     lvl = {'OK': DiagnosticStatus.OK, 'WARN': DiagnosticStatus.WARN, 'ERROR': DiagnosticStatus.ERROR}

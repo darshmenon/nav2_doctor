@@ -276,6 +276,29 @@ def test_inflation_small():
     assert 'INFLATION_SMALL' in codes(d, 1.0)
 
 
+def test_filter_without_mask_is_inert():
+    d = healthy(); d.filter_info('/costmap_filter_info', '/keepout_mask', 0.0); d.filter_pubs['/keepout_mask'] = 0
+    assert 'FILTER_NO_MASK' not in codes(d, 1.0)          # still inside the startup grace
+    assert 'FILTER_NO_MASK' in codes(d, 100.0)
+
+
+def test_filter_with_mask_publisher_is_fine():
+    d = healthy(); d.filter_info('/costmap_filter_info', '/keepout_mask', 0.0); d.filter_pubs['/keepout_mask'] = 1
+    assert 'FILTER_NO_MASK' not in codes(d, 100.0)
+    d.filter_pubs['/keepout_mask'] = 0; d.filter_mask_seen.add('/keepout_mask')   # latched mask already received
+    assert 'FILTER_NO_MASK' not in codes(d, 100.0)
+
+
+def test_configured_filters_without_info():
+    d = healthy(); d.seen('tf', 0.0); d.started = 0.0
+    d.filters_configured = ['keepout_filter']; d.filter_info_pubs = 0
+    assert 'FILTER_NO_INFO' not in codes(d, 1.0)
+    d.tf('map', 'odom', 99.0); d.tf('odom', 'base_link', 99.0); d.seen('odom', 99.0); d.seen('scan', 99.0)
+    assert 'FILTER_NO_INFO' in codes(d, 100.0)
+    d.filter_info_pubs = None                              # unknown: say nothing
+    assert 'FILTER_NO_INFO' not in codes(d, 100.0)
+
+
 def test_nothing_visible_hint():
     d = Doctor(); d.lifecycle = {'controller_server': None}
     assert 'NO_NAV2_VISIBLE' in codes(d, 1.0)
