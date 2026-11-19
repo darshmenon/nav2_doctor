@@ -62,7 +62,7 @@ When Nav2 sits still, finding the cause means juggling `ros2 topic hz`, `tf2_ech
 ## Roadmap
 
 - repeating recovery behaviours; AMCL covariance too high
-- inert costmap filters and a map-distortion check (`map->odom` yaw ramp)
+- a map-distortion check (`map->odom` yaw ramp); inert costmap filters are done (`FILTER_NO_MASK`, `FILTER_NO_INFO`)
 - multi-robot auto-discovery; ERROR lines from `/rosout` tied to the cause
 - PyPI release and a live Jazzy test
 

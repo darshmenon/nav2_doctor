@@ -27,3 +27,5 @@ Ideas from surveying similar tools (Nav2 Ready, TopicForge diagnose-nav2, EasyNa
 - [x] Tag and release 0.3.0 (0.4.0 released since)
 - [x] `IDLE_NO_GOALS`, `MAP_STALL`, `SCAN_TF_AHEAD` checks (unreleased)
 - [x] Cut a release with the three new checks + `RECOVERY_LOOP` fix (0.5.0)
+- [x] Inert costmap filters: `FILTER_NO_MASK`, `FILTER_NO_INFO` (unreleased)
+- [ ] Map-distortion check, multi-robot auto-discovery, /rosout errors tied to the cause

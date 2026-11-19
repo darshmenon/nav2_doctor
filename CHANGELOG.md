@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+- Tests: the two costmap-filter integration tests skip when `nav2_msgs` is not installed (the `ros-base` CI image lacks it); CI was red on that import.
+- Lint: flake8 clean (per-file E501 ignore for the long hint strings in `doctor.py`), `QUALITY_DECLARATION.md` (REP-2004 level 5).
+- New `FILTER_NO_MASK` warning: a `nav2_msgs/CostmapFilterInfo` topic (keepout, speed zones) names a mask topic that nothing publishes, so the filter is inert. Found by discovering the info topics and checking publishers on each mask; a latched mask that was already received counts as fine.
+- New `FILTER_NO_INFO` warning: the local costmap lists `filters` but no `CostmapFilterInfo` publisher exists.
+- Unit tests and two integration tests (info without mask flagged, info with mask clean). Not yet tried on a live Nav2 stack with real filters.
+
 ## 0.6.0
 - Rotating in place now counts as movement: `NO_PROGRESS` and `CMD_NO_MOTION` no longer fire while the robot turns at least `--progress-yaw` radians (default 0.2) in the window. Odometry without orientation behaves as before.
 - `--diagnostics` with `--ns robotN` publishes on `/robotN/diagnostics` instead of the global `/diagnostics`.

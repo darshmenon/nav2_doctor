@@ -51,7 +51,7 @@ HINTS = {
     'MAP_STALL': 'SLAM gets no usable scans: check scan->odom TF errors ("extrapolation"), the scan topic/frame and that SLAM subscribes to the right /scan',
     'SCAN_TF_AHEAD': 'TF is lagging the laser (slow sim / overloaded TF publisher): consumers doing lookup at the scan stamp fail with "extrapolation into the future" - slow the sim down, fix the TF source rate, or let consumers fall back to the latest transform',
     'IDLE_NO_GOALS': 'the goal source (explorer / mission node) may have quit early - check its log for "exploration complete" or filtered frontiers',
-    'CMD_NO_MOTION':'check e-stop, motor enable and that the driver converts cmd_vel; `ros2 topic echo /odom`',
+    'CMD_NO_MOTION': 'check e-stop, motor enable and that the driver converts cmd_vel; `ros2 topic echo /odom`',
     'CLOCK_SKEW': 'sync clocks (chrony) or set use_sim_time consistently on every node',
     'INFLATION_SMALL': 'raise inflation_layer.inflation_radius above robot_radius (or footprint circumradius)',
     'RECOVERY_LOOP': 'find what keeps failing planning/control: read planner/controller logs, check costmap for phantom obstacles, loosen goal tolerance',
@@ -470,6 +470,7 @@ def main(argv=None):
     node.create_subscription(TFMessage, f'{ns}/tf', on_tf, rel)
     if ns:   # shared global /tf with frame prefixes (multi-robot): see on_tf
         node.create_subscription(TFMessage, '/tf', lambda m: on_tf(m, True), rel)
+
     def on_tf_static(m, shared=False):
         for t in m.transforms:
             if shared and not tf_belongs_to(args.ns, t.header.frame_id, t.child_frame_id):
