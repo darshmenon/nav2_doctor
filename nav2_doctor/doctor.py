@@ -6,6 +6,7 @@ Pure-logic `Doctor` (no ROS imports, unit-testable) + a thin rclpy `main()`.
 import argparse
 import json
 import math
+import re
 import time
 from dataclasses import dataclass
 
@@ -57,8 +58,36 @@ HINTS = {
     'RECOVERY_LOOP': 'find what keeps failing planning/control: read planner/controller logs, check costmap for phantom obstacles, loosen goal tolerance',
     'FILTER_NO_MASK': 'start nav2_map_server for the filter mask (and make it active in the lifecycle manager); `ros2 topic info <mask topic> -v` shows the publisher',
     'FILTER_NO_INFO': 'start the costmap_filter_info_server (and add it to the lifecycle manager); the filter in the costmap `filters` list has nothing to read',
+    'LOG_NO_PROGRESS': 'controller_server logged "Failed to make progress": check goal/progress checker tolerances, an obstacle in front, and that cmd_vel reaches the base',
+    'LOG_SENSOR_OUT_OF_BOUNDS': 'a sensor origin is outside the costmap, so it cannot raytrace: enlarge the costmap, or check the sensor frame height and TF',
+    'LOG_TF_LOOKUP': 'a node cannot look up a transform (missing frame, extrapolation): `ros2 run tf2_tools view_frames`, check frame names and use_sim_time on every node',
+    'LOG_PLAN_FAILED': 'planner_server cannot make a path: the goal may be in an obstacle or unreachable; check the global costmap and the goal pose',
+    'LOG_LOOP_SLOW': 'controller loop is missing its rate: machine overloaded or controller_frequency too high for the plugin',
     'NO_NAV2_VISIBLE': 'match ROS_DOMAIN_ID, ROS_LOCALHOST_ONLY, RMW_IMPLEMENTATION and --ns with the robot',
 }
+
+
+# log lines worth naming: (regex on the message, finding code)
+LOG_PATTERNS = (
+    (re.compile(r'failed to make progress', re.I), 'LOG_NO_PROGRESS'),
+    (re.compile(r'sensor origin .*out of map bounds|cannot raytrace', re.I), 'LOG_SENSOR_OUT_OF_BOUNDS'),
+    (re.compile(r'invalid frame id|could not find a connection between|extrapolation|lookup would require|timed out waiting for transform', re.I),
+     'LOG_TF_LOOKUP'),
+    (re.compile(r'failed to create a plan|no valid path|goal .*unreachable|start occupied|goal occupied', re.I),
+     'LOG_PLAN_FAILED'),
+    (re.compile(r'control loop missed its desired rate', re.I), 'LOG_LOOP_SLOW'),
+)
+LOG_NODES = ('controller_server', 'planner_server', 'bt_navigator', 'behavior_server', 'smoother_server',
+             'waypoint_follower', 'local_costmap', 'global_costmap', 'amcl', 'velocity_smoother')
+LOG_WINDOW_S = 30.0
+
+
+def classify_log(msg):
+    """Finding code for a /rosout message, or None."""
+    for rx, code in LOG_PATTERNS:
+        if rx.search(msg):
+            return code
+    return None
 
 
 RECOVERY_WORDS = ('spin', 'backup', 'back_up', 'wait', 'clearentire', 'clear_entire')
@@ -131,6 +160,7 @@ class Doctor:
         self.filter_pubs = {}       # mask topic -> number of publishers
         self.filters_configured = []    # names in the costmap `filters` parameter
         self.filter_info_pubs = None    # publishers on the CostmapFilterInfo topics (None = unknown)
+        self.logs = {}              # LOG_* code -> [message, [times]]
         self.amcl_cov = None        # worst of AMCL x/y variance (m^2) from /amcl_pose
 
     # ---- inputs -------------------------------------------------------
@@ -141,6 +171,13 @@ class Doctor:
     def amcl(self, var_x, var_y, now):
         self.seen('amcl', now)
         self.amcl_cov = max(var_x, var_y)
+
+    def log(self, msg, now):
+        code = classify_log(msg)
+        if code:
+            entry = self.logs.setdefault(code, [msg, []])
+            entry[0] = msg
+            entry[1].append(now)
 
     def tf(self, parent, child, now, skew=None):
         self.seen('tf', now)
@@ -355,6 +392,11 @@ class Doctor:
                              f'costmap lists filters {self.filters_configured} but no CostmapFilterInfo is published - '
                              'the filters are inert'))
 
+        for code, (msg, times) in self.logs.items():
+            recent = [t for t in times if now - t <= LOG_WINDOW_S]
+            if recent:
+                f.append(Finding('WARN', code, f'{len(recent)}x in the last {LOG_WINDOW_S:.0f}s: {msg[:140]}'))
+
         if self.lifecycle and all(v is None for v in self.lifecycle.values()) and not self.last:
             f.append(Finding('WARN', 'NO_NAV2_VISIBLE',
                              'no Nav2 nodes or topics visible - check ROS_DOMAIN_ID, ROS_LOCALHOST_ONLY, RMW '
@@ -489,6 +531,13 @@ def main(argv=None):
                     and (st.sec or st.nanosec):
                 d.stamps(tf=st.sec + st.nanosec / 1e9)
     from rosgraph_msgs.msg import Clock
+    from rcl_interfaces.msg import Log
+
+    def on_rosout(m):
+        base = m.name.split('.')[0].split('/')[-1]
+        if m.level >= 30 and any(n in (m.name or '') or n == base for n in LOG_NODES):
+            d.log(m.msg, clock())
+    node.create_subscription(Log, '/rosout', on_rosout, QoSProfile(depth=200))
     node.create_subscription(Clock, '/clock', on_clock, sd)
     node.create_subscription(TFMessage, f'{ns}/tf', on_tf, rel)
     if ns:   # shared global /tf with frame prefixes (multi-robot): see on_tf

@@ -538,3 +538,38 @@ def test_sim_stamps_do_not_raise_clock_skew_but_wall_stamps_under_sim_do():
     assert 'CLOCK_SKEW' not in codes(d, 1.0)
     d.tf('odom', 'base_link', 1.0, skew=reference_time(1.8e9, 100.0, 0.1) - 1.8e9)  # wall stamp under a sim clock
     assert 'CLOCK_SKEW' in codes(d, 1.0)
+
+
+def test_classify_log_names_the_common_nav2_errors():
+    from nav2_doctor.doctor import classify_log
+    cases = {
+        'Failed to make progress': 'LOG_NO_PROGRESS',
+        'Sensor origin at (0.1, 0.2, 2.0) is out of map bounds. The costmap cannot raytrace for it.': 'LOG_SENSOR_OUT_OF_BOUNDS',
+        'Invalid frame ID "odom" passed to canTransform': 'LOG_TF_LOOKUP',
+        'Timed out waiting for transform from base_link to odom to become available': 'LOG_TF_LOOKUP',
+        'Could not find a connection between map and base_link': 'LOG_TF_LOOKUP',
+        'Extrapolation Error: Lookup would require extrapolation into the future': 'LOG_TF_LOOKUP',
+        'Failed to create a plan from potential when a legal potential was found': 'LOG_PLAN_FAILED',
+        'Control loop missed its desired rate of 20.0000Hz': 'LOG_LOOP_SLOW',
+    }
+    for text, code in cases.items():
+        assert classify_log(text) == code, text
+    assert classify_log('Received a goal, begin computing control effort') is None
+
+
+def test_log_finding_counts_repeats_and_expires():
+    d = healthy(2.9)
+    d.log('Failed to make progress', 1.0)
+    d.log('Failed to make progress', 2.0)
+    d.log('unrelated info line', 2.0)
+    found = {f.code: f for f in d.diagnose(3.0)}
+    assert found['LOG_NO_PROGRESS'].level == 'WARN' and found['LOG_NO_PROGRESS'].msg.startswith('2x')
+    assert 'HEALTHY' in found                                   # a warning alone is not a stall
+    d2 = healthy(100.0)
+    d2.logs = d.logs
+    assert 'LOG_NO_PROGRESS' not in codes(d2, 100.0)            # older than the window: gone
+
+
+def test_every_log_code_has_a_hint():
+    from nav2_doctor.doctor import LOG_PATTERNS, HINTS
+    assert all(code in HINTS for _, code in LOG_PATTERNS)
