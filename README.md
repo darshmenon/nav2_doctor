@@ -48,6 +48,12 @@ ERROR [COSTMAP_STALE] local costmap not updating (3.8s) - usually a TF or scan p
 
 Checked servers: `controller_server`, `planner_server`, `bt_navigator`, `behavior_server`, `smoother_server`, `waypoint_follower`. Verified on Humble against a live Gazebo sim (a frozen bridge is caught within about 3 s and clears on recovery) and in CI on Humble and Jazzy against a fake Nav2 graph.
 
+## Simulation
+
+![nav2_doctor on a simulated Nav2 run](docs/nav_sim.gif)
+
+A matplotlib replay of a robot driving a planned path while two faults are injected: a paused bridge (TF, odom and scan stop, 12 to 24 s) and a stalled controller (`cmd_vel` is zero, 40 to 56 s). The trail is coloured by the doctor's verdict at each moment, and the timeline shows which finding fires when. The robot, obstacles and faults are simulated; the verdicts come from the real `Doctor` class (here with `--progress-time 8` so the run stays short). Regenerate with `python3 docs/nav_sim.py` (needs matplotlib and pillow).
+
 ## Why
 
 When Nav2 sits still, finding the cause means juggling `ros2 topic hz`, `tf2_echo`, `ros2 lifecycle get` and the logs. nav2_doctor runs those checks together. Pair it with [nav2_fault_inject](https://github.com/darshmenon/nav2_fault_inject) to break a stack on purpose and watch the doctor name the cause.

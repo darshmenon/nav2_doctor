@@ -29,3 +29,10 @@ Ideas from surveying similar tools (Nav2 Ready, TopicForge diagnose-nav2, EasyNa
 - [x] Cut a release with the three new checks + `RECOVERY_LOOP` fix (0.5.0)
 - [x] Inert costmap filters: `FILTER_NO_MASK`, `FILTER_NO_INFO` (unreleased)
 - [ ] Map-distortion check, multi-robot auto-discovery, /rosout errors tied to the cause
+
+## From the 2026-11-20 research (web + GitHub; see ~/rosnav/todo.md for the full list)
+- [ ] Ingest `/diagnostics` and show ERROR/WARN entries as findings (hardware status; ros2_control publishes `DiagnosticArray` in `example_17`)
+- [ ] Check we cover Nav2 Ready's list: sensor-to-base transform for the scan frame, `cmd_vel` subscriber, ROS time settings; add `SCAN_FRAME_NO_TF` if the scan frame has no TF to the base
+- [ ] `--expect /scan:10` style per-topic minimum rates
+- [ ] Offline replay on a rosbag2 (`--bag`), so a recorded failure can be diagnosed after the fact
+- [ ] Closed-loop scoreboard against `nav2_fault_inject`: recall per injected fault in the README
