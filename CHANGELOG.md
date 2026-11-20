@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Release workflow: removed the `pypi` job (it failed on every tag without a trusted publisher, and rclpy cannot come from PyPI anyway). Packaging metadata stays in `setup.py`.
 
 ## 0.6.1
 - Fix: `CLOCK_SKEW` no longer fires falsely under Gazebo; when `/clock` is published, TF stamps are compared with sim time instead of the wall clock. Found by running against the rosnav Gazebo sim (now reports HEALTHY there).
