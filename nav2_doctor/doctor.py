@@ -365,6 +365,16 @@ class Doctor:
         return f
 
 
+SIM_CLOCK_FRESH_S = 2.0   # a /clock message newer than this means a simulator is driving time
+
+
+def reference_time(wall_now, sim_time=None, sim_age=None):
+    """Time that TF stamps should be compared with: sim time while /clock is live, else the wall clock."""
+    if sim_time is not None and sim_age is not None and sim_age < SIM_CLOCK_FRESH_S:
+        return sim_time
+    return wall_now
+
+
 def tf_belongs_to(ns, parent, child):
     """True if a transform on the shared /tf touches robot `ns` (frames prefixed `ns/`)."""
     pre = ns.strip('/') + '/'
@@ -459,11 +469,10 @@ def main(argv=None):
         sim_clock['t'] = m.clock.sec + m.clock.nanosec / 1e9
         sim_clock['seen'] = time.monotonic()
 
-    def reference_time():
+    def now_ref():
         # Under Gazebo the stamps are sim time, so compare against /clock, not the wall clock
-        if 'seen' in sim_clock and time.monotonic() - sim_clock['seen'] < 2.0:
-            return sim_clock['t']
-        return node.get_clock().now().nanoseconds / 1e9
+        age = time.monotonic() - sim_clock['seen'] if 'seen' in sim_clock else None
+        return reference_time(node.get_clock().now().nanoseconds / 1e9, sim_clock.get('t'), age)
 
     def on_tf(m, shared=False):
         for t in m.transforms:
@@ -474,7 +483,7 @@ def main(argv=None):
             st = t.header.stamp
             skew = None
             if st.sec or st.nanosec:   # zero stamp = unstamped, nothing to compare
-                skew = reference_time() - (st.sec + st.nanosec / 1e9)
+                skew = now_ref() - (st.sec + st.nanosec / 1e9)
             d.tf(t.header.frame_id, t.child_frame_id, clock(), skew)
             if t.child_frame_id.lstrip('/').endswith('base_link') and t.header.frame_id.lstrip('/').endswith('odom') \
                     and (st.sec or st.nanosec):

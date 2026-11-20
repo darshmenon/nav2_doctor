@@ -522,3 +522,19 @@ def test_diagnostics_topic_and_yaw_helpers():
     import math
     q = NS(x=0.0, y=0.0, z=math.sin(0.4), w=math.cos(0.4))
     assert abs(yaw_of(q) - 0.8) < 1e-9
+
+
+def test_reference_time_uses_sim_clock_only_while_it_is_live():
+    from nav2_doctor.doctor import reference_time
+    assert reference_time(1.8e9) == 1.8e9                         # no /clock: wall clock
+    assert reference_time(1.8e9, sim_time=42.0, sim_age=0.5) == 42.0   # sim running: stamps are sim time
+    assert reference_time(1.8e9, sim_time=42.0, sim_age=5.0) == 1.8e9  # /clock went quiet: back to wall
+
+
+def test_sim_stamps_do_not_raise_clock_skew_but_wall_stamps_under_sim_do():
+    from nav2_doctor.doctor import reference_time
+    d = healthy()
+    d.tf('odom', 'base_link', 1.0, skew=reference_time(1.8e9, 100.0, 0.1) - 99.9)   # sim stamp vs sim clock
+    assert 'CLOCK_SKEW' not in codes(d, 1.0)
+    d.tf('odom', 'base_link', 1.0, skew=reference_time(1.8e9, 100.0, 0.1) - 1.8e9)  # wall stamp under a sim clock
+    assert 'CLOCK_SKEW' in codes(d, 1.0)
