@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+- Fix: `CLOCK_SKEW` no longer fires falsely under Gazebo; when `/clock` is published, TF stamps are compared with sim time instead of the wall clock. Found by running against the rosnav Gazebo sim (now reports HEALTHY there).
+- PyPI: `setup.py` carries the long description and metadata, and `release.yml` has a `pypi` job (needs a trusted publisher configured on pypi.org). rclpy still comes from the ROS install, not PyPI.
 - Tests: the two costmap-filter integration tests skip when `nav2_msgs` is not installed (the `ros-base` CI image lacks it); CI was red on that import.
 - Lint: flake8 clean (per-file E501 ignore for the long hint strings in `doctor.py`), `QUALITY_DECLARATION.md` (REP-2004 level 5).
 - New `FILTER_NO_MASK` warning: a `nav2_msgs/CostmapFilterInfo` topic (keepout, speed zones) names a mask topic that nothing publishes, so the filter is inert. Found by discovering the info topics and checking publishers on each mask; a latched mask that was already received counts as fine.

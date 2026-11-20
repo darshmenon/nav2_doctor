@@ -453,6 +453,18 @@ def main(argv=None):
     sd = qos_profile_sensor_data
     rel = QoSProfile(depth=100)
 
+    sim_clock = {}   # latest /clock message (sim time) and when it arrived; set only when a sim publishes /clock
+
+    def on_clock(m):
+        sim_clock['t'] = m.clock.sec + m.clock.nanosec / 1e9
+        sim_clock['seen'] = time.monotonic()
+
+    def reference_time():
+        # Under Gazebo the stamps are sim time, so compare against /clock, not the wall clock
+        if 'seen' in sim_clock and time.monotonic() - sim_clock['seen'] < 2.0:
+            return sim_clock['t']
+        return node.get_clock().now().nanoseconds / 1e9
+
     def on_tf(m, shared=False):
         for t in m.transforms:
             # Stacks that remap every robot's TF onto one global /tf use frame prefixes (robot1/odom ...):
@@ -462,11 +474,13 @@ def main(argv=None):
             st = t.header.stamp
             skew = None
             if st.sec or st.nanosec:   # zero stamp = unstamped, nothing to compare
-                skew = node.get_clock().now().nanoseconds / 1e9 - (st.sec + st.nanosec / 1e9)
+                skew = reference_time() - (st.sec + st.nanosec / 1e9)
             d.tf(t.header.frame_id, t.child_frame_id, clock(), skew)
             if t.child_frame_id.lstrip('/').endswith('base_link') and t.header.frame_id.lstrip('/').endswith('odom') \
                     and (st.sec or st.nanosec):
                 d.stamps(tf=st.sec + st.nanosec / 1e9)
+    from rosgraph_msgs.msg import Clock
+    node.create_subscription(Clock, '/clock', on_clock, sd)
     node.create_subscription(TFMessage, f'{ns}/tf', on_tf, rel)
     if ns:   # shared global /tf with frame prefixes (multi-robot): see on_tf
         node.create_subscription(TFMessage, '/tf', lambda m: on_tf(m, True), rel)

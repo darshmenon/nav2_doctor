@@ -64,6 +64,6 @@ When Nav2 sits still, finding the cause means juggling `ros2 topic hz`, `tf2_ech
 - repeating recovery behaviours; AMCL covariance too high
 - a map-distortion check (`map->odom` yaw ramp); inert costmap filters are done (`FILTER_NO_MASK`, `FILTER_NO_INFO`)
 - multi-robot auto-discovery; ERROR lines from `/rosout` tied to the cause
-- PyPI release and a live Jazzy test
+- a live Jazzy test (the PyPI publish job is wired in release.yml; it needs a trusted publisher set up on pypi.org first)
 
 Build: `colcon build --packages-select nav2_doctor`. Tests: `python3 -m pytest test` (unit tests need no ROS; the integration tests run the real CLI against a fake Nav2 graph when ROS 2 is sourced).
