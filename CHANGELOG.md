@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+
+## 0.7.0
 - New `LOG_*` warnings from `/rosout`: `LOG_NO_PROGRESS` ("Failed to make progress"), `LOG_SENSOR_OUT_OF_BOUNDS`, `LOG_TF_LOOKUP` (invalid frame, no connection, extrapolation, timed out waiting for transform), `LOG_PLAN_FAILED`, `LOG_LOOP_SLOW`. Only warn/error lines from Nav2 nodes, counted over 30 s, each with a hint. Unit-tested on the message patterns; not yet run live against a stack that emits them.
 - Release workflow: removed the `pypi` job (it failed on every tag without a trusted publisher, and rclpy cannot come from PyPI anyway). Packaging metadata stays in `setup.py`.
 
