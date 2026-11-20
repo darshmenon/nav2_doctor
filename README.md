@@ -54,6 +54,12 @@ Checked servers: `controller_server`, `planner_server`, `bt_navigator`, `behavio
 
 A matplotlib replay of a robot driving a planned path while two faults are injected: a paused bridge (TF, odom and scan stop, 12 to 24 s) and a stalled controller (`cmd_vel` is zero, 40 to 56 s). The trail is coloured by the doctor's verdict at each moment, and the timeline shows which finding fires when. The robot, obstacles and faults are simulated; the verdicts come from the real `Doctor` class (here with `--progress-time 8` so the run stays short). Regenerate with `python3 docs/nav_sim.py` (needs matplotlib and pillow).
 
+### What the doctor sees
+
+![Nav2 graph: edges turn red as the doctor flags them](docs/nav_graph.gif)
+
+The same run as a graph: ovals are nodes, boxes are topics, and an edge turns red when a finding covers it (`/scan`, `/tf` and `/odom` for a frozen bridge, `/cmd_vel` for a zero command). The layout is hand-placed for clarity, not read from a live `ros2 node list`.
+
 ## Why
 
 When Nav2 sits still, finding the cause means juggling `ros2 topic hz`, `tf2_echo`, `ros2 lifecycle get` and the logs. nav2_doctor runs those checks together. Pair it with [nav2_fault_inject](https://github.com/darshmenon/nav2_fault_inject) to break a stack on purpose and watch the doctor name the cause.
