@@ -45,6 +45,8 @@ HINTS = {
     'NODE_INACTIVE': 'see the lifecycle_manager log; usually a YAML param error. `ros2 lifecycle get /<node>`',
     'GOAL_FLAPPING': 'add hysteresis/min goal distance to the exploration or goal source',
     'NO_CMD_VEL': 'controller_server isn\'t producing output; check its log and that the goal checker/plugins loaded',
+    'RATE_DROP': 'a stream is much slower than this robot\'s learned normal: check CPU load, a throttled bridge or a degraded driver; re-learn with --learn if the change is intended',
+    'RATE_SPIKE': 'a stream is much faster than this robot\'s learned normal: a duplicate publisher or a changed driver setting; re-learn with --learn if intended',
     'CMD_ZERO': 'planner or controller failed; check bt_navigator and controller_server logs, clear costmaps',
     'NO_PROGRESS': 'check progress_checker params and for an obstacle; see recovery behaviours in the BT log',
     'AMCL_UNCERTAIN': 'publish /initialpose in RViz, check the map matches the world, and that /scan is reaching AMCL',
@@ -116,6 +118,9 @@ def inscribed_radius(footprint):
     return best
 
 
+ARRIVALS_KEEP = 1500    # arrival times kept per stream for baselines
+
+
 @dataclass
 class Finding:
     level: str   # ERROR | WARN | OK
@@ -138,6 +143,8 @@ class Doctor:
         self.poses = []          # (time, x, y, yaw) odometry samples; yaw is None when unknown
         self.goal_since = None   # when the current goal became active
         self.last = {}           # stream name -> last receipt time
+        self.arrivals = {}       # stream name -> recent receipt times (for baselines)
+        self.baseline = None     # learned per-robot rates (see baseline.py), or None
         self.tf_edges = {}       # (parent, child) -> last receipt time
         self.static_edges = set()   # (parent, child) from /tf_static: published once, never stale
         self.lifecycle = {}      # node -> state label or None (unreachable)
@@ -167,6 +174,10 @@ class Doctor:
     def seen(self, stream, now):
         self.started = self.started if self.started is not None else now
         self.last[stream] = now
+        a = self.arrivals.setdefault(stream, [])
+        a.append(now)
+        if len(a) > ARRIVALS_KEEP:
+            del a[:len(a) - ARRIVALS_KEEP]
 
     def amcl(self, var_x, var_y, now):
         self.seen('amcl', now)
@@ -263,6 +274,13 @@ class Doctor:
 
     # ---- diagnosis ----------------------------------------------------
     def diagnose(self, now):
+        f = self._diagnose(now)
+        if self.baseline:
+            from nav2_doctor import baseline as bl
+            f.extend(Finding(lv, code, msg) for lv, code, msg in bl.check(self.baseline, self.arrivals, now))
+        return f
+
+    def _diagnose(self, now):
         f = []
         age_tf = self._age('tf', now)
         if age_tf is None:
@@ -489,6 +507,10 @@ def main(argv=None):
     ap.add_argument('--diagnostics', action='store_true',
                     help='also publish findings as diagnostic_msgs/DiagnosticArray on /diagnostics (<ns>/diagnostics with --ns)')
     ap.add_argument('--once', type=float, default=0.0, help='watch N seconds, print one report, exit')
+    ap.add_argument('--learn', type=float, default=0.0, metavar='SECS',
+                    help='watch a healthy robot for SECS, write per-stream normal rates to --baseline-file, exit')
+    ap.add_argument('--baseline-file', default='nav2_baseline.json', help='where --learn writes, and --baseline reads')
+    ap.add_argument('--baseline', action='store_true', help='also flag streams far slower or faster than the learned baseline')
     ap.add_argument('--ready', nargs='?', type=float, const=10.0, default=None, metavar='SECS',
                     help='pre-flight: watch SECS (default 10), print hints and a READY / NOT READY verdict; '
                          'exit 1 if not ready (lifecycle nodes must already be active)')
@@ -501,6 +523,11 @@ def main(argv=None):
     d = Doctor(args.startup_grace, args.stale, args.flap_window, args.flap_count,
                args.progress_time, args.progress_dist, args.progress_yaw)
     ns = ('/' + args.ns.strip('/')) if args.ns else ''
+    if args.baseline:
+        from nav2_doctor import baseline as bl
+        d.baseline = bl.load(args.baseline_file)
+    if args.learn:
+        args.once = args.learn
     clock = time.monotonic
     sd = qos_profile_sensor_data
     rel = QoSProfile(depth=100)
@@ -702,6 +729,13 @@ def main(argv=None):
 
     def tick():
         if args.once and clock() - start >= args.once:
+            if args.learn:
+                from nav2_doctor import baseline as bl
+                learned = bl.learn(d.arrivals)
+                bl.save(learned, args.baseline_file)
+                print(f'learned {len(learned)} streams -> {args.baseline_file}: ' +
+                      ', '.join(f'{k} {v["hz"]:g} Hz' for k, v in sorted(learned.items())), flush=True)
+                raise SystemExit
             found = report()
             errors = [x for x in found if x.level == 'ERROR']
             exit_code[0] = 1 if errors else 0

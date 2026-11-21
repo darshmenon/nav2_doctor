@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Per-robot baselines: `--learn SECS` records the normal message rate of each stream, `--baseline` then warns with `RATE_DROP` / `RATE_SPIKE` when a stream drops below half or exceeds double that. Plain statistics (median messages per second), no model. Unit-tested, and run live against the fake Nav2 graph (learn, quiet when unchanged, `RATE_DROP` when the scan slows to a tenth). The live test found and fixed a bug: TF arrives in bursts, so a median-interval rate was absurd; the rate is now counted per second.
 
 ## 0.7.0
 - New `LOG_*` warnings from `/rosout`: `LOG_NO_PROGRESS` ("Failed to make progress"), `LOG_SENSOR_OUT_OF_BOUNDS`, `LOG_TF_LOOKUP` (invalid frame, no connection, extrapolation, timed out waiting for transform), `LOG_PLAN_FAILED`, `LOG_LOOP_SLOW`. Only warn/error lines from Nav2 nodes, counted over 30 s, each with a hint. Unit-tested on the message patterns; not yet run live against a stack that emits them.

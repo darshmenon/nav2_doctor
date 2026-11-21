@@ -44,6 +44,7 @@ ERROR [COSTMAP_STALE] local costmap not updating (3.8s) - usually a TF or scan p
 | `GOAL_FLAPPING` | warn | 4 or more goals cancelled or aborted within 30 s (an oscillating goal source) |
 | `AMCL_UNCERTAIN` | warn | `/amcl_pose` covariance above 0.5 m^2, so the robot is poorly localised |
 | `NO_PROGRESS` | warn | a goal is active but odometry shows the robot hasn't moved (15 s, 0.1 m by default) |
+| `RATE_DROP` / `RATE_SPIKE` | warn | with `--baseline`: a stream runs below half or above double the rate learned by `--learn` |
 | `CMD_ZERO` / `NO_CMD_VEL` | error | a goal is active but `cmd_vel` is zero or absent |
 
 Checked servers: `controller_server`, `planner_server`, `bt_navigator`, `behavior_server`, `smoother_server`, `waypoint_follower`. Verified on Humble against a live Gazebo sim (a frozen bridge is caught within about 3 s and clears on recovery) and in CI on Humble and Jazzy against a fake Nav2 graph.
@@ -59,6 +60,17 @@ A matplotlib replay of a robot driving a planned path while two faults are injec
 ![Nav2 graph: edges turn red as the doctor flags them](docs/nav_graph.gif)
 
 The same run as a graph: ovals are nodes, boxes are topics, and an edge turns red when a finding covers it (`/scan`, `/tf` and `/odom` for a frozen bridge, `/cmd_vel` for a zero command). The layout is hand-placed for clarity, not read from a live `ros2 node list`.
+
+## Per-robot baselines
+
+Fixed thresholds do not fit every robot: a 5 Hz lidar is healthy on one machine and broken on another. Record what normal looks like once, then get warned when a stream drifts from it:
+
+```bash
+nav2_doctor --learn 60 --baseline-file my_robot.json      # on a healthy robot: writes the normal rate of each stream
+nav2_doctor --baseline --baseline-file my_robot.json      # later: RATE_DROP / RATE_SPIKE when a stream is below half or above double normal
+```
+
+The rate is the median messages per second (so bursts and a few stalls do not skew it); there is no model and no training data, and each finding states the learned number it is compared with. A silent stream is still reported by the stale checks, not here. Re-learn after you change a driver or a bridge setting on purpose.
 
 ## Why
 

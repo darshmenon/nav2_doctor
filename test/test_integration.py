@@ -96,7 +96,8 @@ class FakeNav2(Node):
                 yaw = 0.5 * (time.monotonic() - self.t0)
                 od.pose.pose.orientation.z, od.pose.pose.orientation.w = math.sin(yaw / 2), math.cos(yaw / 2)
             self.odom_pub.publish(od)
-        if self.alive('stop_scan'):
+        self.k = getattr(self, 'k', 0) + 1
+        if self.alive('stop_scan') and self.k % self.cfg.get('scan_div', 1) == 0:
             self.scan_pub.publish(LaserScan())
         tw = Twist()
         if self.cfg.get('cmd') == 'move':
@@ -279,3 +280,14 @@ def test_filter_without_mask_publisher_is_flagged():
 def test_filter_with_mask_is_fine():
     codes, rc, out = run({'cmd': 'move', 'filter': 'ok'})
     assert 'FILTER_NO_MASK' not in codes and 'HEALTHY' in codes, out
+
+
+def test_learn_then_baseline_flags_a_slowed_scan(tmp_path):
+    f = str(tmp_path / 'base.json')
+    _, rc, out = run({'cmd': 'move'}, args=('--learn', '8', '--baseline-file', f), secs=8)
+    learned = json.load(open(f))['streams']
+    assert rc == 0 and 'scan' in learned and 15 < learned['scan']['hz'] < 25, (learned, out)
+    codes, _, out = run({'cmd': 'move'}, args=('--baseline', '--baseline-file', f), secs=8)
+    assert not {'RATE_DROP', 'RATE_SPIKE'} & codes, out                 # same robot, same rate: quiet
+    codes, _, out = run({'cmd': 'move', 'scan_div': 10}, args=('--baseline', '--baseline-file', f), secs=9)
+    assert 'RATE_DROP' in codes and 'SCAN_STALE' not in codes, out       # scan at a tenth of normal
