@@ -62,3 +62,34 @@ def test_arrivals_are_bounded():
     for i in range(5000):
         d.seen('scan', i * 0.01)
     assert len(d.arrivals['scan']) <= 1500
+
+
+def test_parse_expect_accepts_colon_and_equals_and_rejects_junk():
+    import pytest
+    assert bl.parse_expect(['scan:10', '/odom=20.5']) == {'scan': {'hz': 10.0, 'jitter': 0.0, 'n': 0},
+                                                         'odom': {'hz': 20.5, 'jitter': 0.0, 'n': 0}}
+    for bad in ('scan', 'scan:fast', 'scan:0', ':5'):
+        with pytest.raises(ValueError):
+            bl.parse_expect([bad])
+
+
+def test_expected_rate_feeds_check():
+    exp = bl.parse_expect(['scan:10'])
+    assert bl.check(exp, {'scan': stream(10, 20)}, 19.9) == []
+    assert bl.check(exp, {'scan': stream(3, 20)}, 19.9)[0][1] == 'RATE_DROP'
+
+
+def test_load_rejects_bad_files_with_a_readable_error(tmp_path):
+    import pytest
+    cases = {'missing.json': None, 'empty.json': '', 'notjson.json': 'hello', 'nokey.json': '{"version": 1}',
+             'nohz.json': '{"streams": {"scan": {"jitter": 1}}}', 'zero.json': '{"streams": {"scan": {"hz": 0}}}',
+             'text.json': '{"streams": {"scan": {"hz": "fast"}}}', 'list.json': '[1, 2]'}
+    for name, txt in cases.items():
+        p = tmp_path / name
+        if txt is not None:
+            p.write_text(txt)
+        with pytest.raises(ValueError):
+            bl.load(str(p))
+    good = tmp_path / 'good.json'
+    bl.save({'scan': {'hz': 10.0, 'jitter': 0.0, 'n': 5}}, str(good))
+    assert bl.load(str(good))['scan']['hz'] == 10.0

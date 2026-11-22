@@ -66,6 +66,7 @@ The same run as a graph: ovals are nodes, boxes are topics, and an edge turns re
 Fixed thresholds do not fit every robot: a 5 Hz lidar is healthy on one machine and broken on another. Record what normal looks like once, then get warned when a stream drifts from it:
 
 ```bash
+nav2_doctor --expect scan:10 --expect odom:20             # no learning: state the normal rate, flag drops/spikes
 nav2_doctor --learn 60 --baseline-file my_robot.json      # on a healthy robot: writes the normal rate of each stream
 nav2_doctor --baseline --baseline-file my_robot.json      # later: RATE_DROP / RATE_SPIKE when a stream is below half or above double normal
 ```

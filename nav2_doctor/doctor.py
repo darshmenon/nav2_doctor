@@ -181,7 +181,10 @@ class Doctor:
 
     def amcl(self, var_x, var_y, now):
         self.seen('amcl', now)
-        self.amcl_cov = max(var_x, var_y)
+        cov = max(var_x, var_y)
+        # NaN compares False against every threshold, so a diverged filter (NaN covariance) used to look healthy;
+        # a non-finite covariance is the worst localization there is.
+        self.amcl_cov = cov if math.isfinite(cov) else float('inf')
 
     def log(self, msg, now):
         code = classify_log(msg)
@@ -333,6 +336,9 @@ class Doctor:
             moving = self.last_cmd_nonzero is not None and now - self.last_cmd_nonzero < self.stale_s
             if a is None:
                 f.append(Finding('ERROR', 'NO_CMD_VEL', 'goal active but nothing publishes cmd_vel - controller not producing output'))
+            elif a >= self.stale_s:
+                # it published before and then went silent (hung / paused / crashed controller): that is NOT a zero command
+                f.append(Finding('ERROR', 'NO_CMD_VEL', f'goal active but cmd_vel has been silent for {a:.1f}s - controller stopped producing output'))
             elif not moving:
                 f.append(Finding('ERROR', 'CMD_ZERO', 'goal active but cmd_vel is zero - planner/controller failed or path blocked'))
 
@@ -510,6 +516,9 @@ def main(argv=None):
     ap.add_argument('--learn', type=float, default=0.0, metavar='SECS',
                     help='watch a healthy robot for SECS, write per-stream normal rates to --baseline-file, exit')
     ap.add_argument('--baseline-file', default='nav2_baseline.json', help='where --learn writes, and --baseline reads')
+    ap.add_argument('--expect', action='append', default=[], metavar='STREAM:HZ',
+                    help='expected rate for a stream, e.g. --expect scan:10 (repeatable); flags it when far slower/faster, '
+                         'no --learn needed, overrides a learned value')
     ap.add_argument('--baseline', action='store_true', help='also flag streams far slower or faster than the learned baseline')
     ap.add_argument('--ready', nargs='?', type=float, const=10.0, default=None, metavar='SECS',
                     help='pre-flight: watch SECS (default 10), print hints and a READY / NOT READY verdict; '
@@ -525,7 +534,18 @@ def main(argv=None):
     ns = ('/' + args.ns.strip('/')) if args.ns else ''
     if args.baseline:
         from nav2_doctor import baseline as bl
-        d.baseline = bl.load(args.baseline_file)
+        try:
+            d.baseline = bl.load(args.baseline_file)
+        except ValueError as e:
+            ap.error(str(e))
+    if args.expect:
+        from nav2_doctor import baseline as bl
+        try:
+            expected = bl.parse_expect(args.expect)
+        except ValueError as e:
+            ap.error(str(e))
+        d.baseline = {**(d.baseline or {}), **expected}
+        print('[nav2_doctor] expecting rates: ' + ', '.join(f'{k}={v["hz"]:g} Hz' for k, v in sorted(expected.items())))
     if args.learn:
         args.once = args.learn
     clock = time.monotonic

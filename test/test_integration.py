@@ -291,3 +291,12 @@ def test_learn_then_baseline_flags_a_slowed_scan(tmp_path):
     assert not {'RATE_DROP', 'RATE_SPIKE'} & codes, out                 # same robot, same rate: quiet
     codes, _, out = run({'cmd': 'move', 'scan_div': 10}, args=('--baseline', '--baseline-file', f), secs=9)
     assert 'RATE_DROP' in codes and 'SCAN_STALE' not in codes, out       # scan at a tenth of normal
+
+
+def test_expect_flags_wrong_rate_without_learning():
+    codes, _, out = run({'cmd': 'move'}, args=('--expect', 'scan:20'), secs=8)
+    assert not {'RATE_DROP', 'RATE_SPIKE'} & codes, out                  # the fake scan really runs ~20 Hz: quiet
+    codes, _, out = run({'cmd': 'move'}, args=('--expect', 'scan:100'), secs=8)
+    assert 'RATE_DROP' in codes and 'expecting rates: scan=100 Hz' in out, out   # robot is far below what was stated
+    codes, rc, out = run({'cmd': 'move'}, args=('--expect', 'scan'), secs=2)
+    assert rc == 2, out                                                  # argparse error (message goes to stderr)

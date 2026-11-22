@@ -573,3 +573,27 @@ def test_log_finding_counts_repeats_and_expires():
 def test_every_log_code_has_a_hint():
     from nav2_doctor.doctor import LOG_PATTERNS, HINTS
     assert all(code in HINTS for _, code in LOG_PATTERNS)
+
+
+def test_cmd_vel_going_silent_while_goal_active_is_no_cmd_vel_not_cmd_zero():
+    # found by the 9-fault scoreboard (2026-11-22): pausing controller_server mid-goal stops cmd_vel entirely, but the
+    # doctor said CMD_ZERO ("cmd_vel is zero") because cmd_vel had been seen before. Silence is NO_CMD_VEL.
+    d = healthy(); d.goal_active = True
+    d.cmd(0.3, 0, 0.0)                                   # was driving, then nothing
+    d.tf('map', 'odom', 5.0); d.tf('odom', 'base_link', 5.0); d.seen('odom', 5.0); d.seen('scan', 5.0)
+    c = codes(d, 5.5)
+    assert 'NO_CMD_VEL' in c and 'CMD_ZERO' not in c
+    # a zero command that IS being published stays CMD_ZERO, and a recent non-zero one stays healthy
+    d.cmd(0, 0, 5.4)
+    assert 'CMD_ZERO' in codes(d, 5.5) and 'NO_CMD_VEL' not in codes(d, 5.5)
+    d.cmd(0.3, 0, 5.45)
+    assert 'CMD_ZERO' not in codes(d, 5.5) and 'NO_CMD_VEL' not in codes(d, 5.5)
+
+
+def test_nan_amcl_covariance_is_uncertain_not_healthy():
+    # NaN > threshold is False, so a diverged AMCL (NaN covariance) used to be reported as HEALTHY
+    d = healthy(); d.amcl(float('nan'), float('nan'), 0.5)
+    c = codes(d, 1.0)
+    assert 'AMCL_UNCERTAIN' in c
+    d = healthy(); d.amcl(0.01, 0.01, 0.5)
+    assert 'AMCL_UNCERTAIN' not in codes(d, 1.0)

@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+- Fix: a controller that goes silent while a goal is active (hung, paused or crashed) is now reported as `NO_CMD_VEL` ("silent for N s"), not `CMD_ZERO` ("cmd_vel is zero"), because nothing is being published. A published zero command stays `CMD_ZERO`. Found by the 9-fault scoreboard against a live headless Nav2 stack (`nav2_fault_inject run --check`, 2026-11-22: SIGSTOP of `controller_server` was labelled `CMD_ZERO`). Regression test in `test_doctor.py`.
+- `--expect STREAM:HZ` (repeatable, e.g. `--expect scan:10`): state the normal rate yourself and get `RATE_DROP` / `RATE_SPIKE` without a `--learn` run; overrides a learned value for that stream. Unit-tested, and run against the fake Nav2 graph: quiet at the true scan rate, `RATE_DROP` when 100 Hz is expected, exit 2 on a malformed value.
 - Per-robot baselines: `--learn SECS` records the normal message rate of each stream, `--baseline` then warns with `RATE_DROP` / `RATE_SPIKE` when a stream drops below half or exceeds double that. Plain statistics (median messages per second), no model. Unit-tested, and run live against the fake Nav2 graph (learn, quiet when unchanged, `RATE_DROP` when the scan slows to a tenth). The live test found and fixed a bug: TF arrives in bursts, so a median-interval rate was absurd; the rate is now counted per second.
 
 ## 0.7.0
