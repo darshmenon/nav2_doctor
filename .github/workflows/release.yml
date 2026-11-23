@@ -19,3 +19,19 @@ jobs:
         with:
           files: ${{ runner.temp }}/nav2_doctor-*.tar.gz
           body_path: CHANGELOG.md
+  # Publishes to PyPI with trusted publishing (no token). Off until the repo variable PYPI_PUBLISH is set to true,
+  # so a tag cannot fail here before pypi.org has a trusted publisher for darshmenon/nav2_doctor, workflow release.yml,
+  # environment pypi. rclpy is not a PyPI package: the wheel installs the doctor, ROS 2 must already be sourced.
+  pypi:
+    needs: release
+    if: ${{ vars.PYPI_PUBLISH == 'true' }}
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.10'}
+      - run: pip install build && python -m build
+      - uses: pypa/gh-action-pypi-publish@release/v1

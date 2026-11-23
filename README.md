@@ -12,6 +12,10 @@
 
 Born in [rosnav](https://github.com/darshmenon/rosnav), a ROS 2 Nav2 stack with SLAM, frontier exploration and multi-robot fleets; rosnav ships this as `scripts/nav2_doctor.py` and tested it on its live Gazebo maze sim.
 
+## Install
+
+nav2_doctor needs a ROS 2 environment (Humble or Jazzy): `rclpy` comes from the ROS install, not from PyPI. Source ROS first (`source /opt/ros/<distro>/setup.bash`), then either build it in a colcon workspace (below) or, once published, `pip install nav2-doctor` into that same environment. Without ROS the command prints a short message and exits with code 2.
+
 ## Quick start
 
 ```bash
@@ -73,6 +77,18 @@ nav2_doctor --baseline --baseline-file my_robot.json      # later: RATE_DROP / R
 
 The rate is the median messages per second (so bursts and a few stalls do not skew it); there is no model and no training data, and each finding states the learned number it is compared with. A silent stream is still reported by the stale checks, not here. Re-learn after you change a driver or a bridge setting on purpose.
 
+## Fault-injection scoreboard
+
+Measured with [nav2_fault_inject](https://github.com/darshmenon/nav2_fault_inject): one headless single-robot maze sim, nine injected pauses (`parameter_bridge` for `SCAN_STALE`, `controller_server` for `NO_CMD_VEL`, `slam_toolbox` for `TF_EDGE_STALE`, three each), a finding must appear within 10 s.
+
+| run | doctor | detected |
+|---|---|---|
+| 1 | before any fix (6 s controller pause, longer than Nav2's 4 s bond timeout, so not comparable) | 6/9 |
+| 2 | after the `CMD_ZERO` vs `NO_CMD_VEL` fix | 6/9 (all three `NO_CMD_VEL` missed) |
+| 4 | after also watching `/cmd_vel_nav` | 9/9 |
+
+The run 2 misses were measured: a 3 s `controller_server` pause leaves `/cmd_vel` silent for only 1.25 to 1.75 s (the velocity smoother keeps repeating), under the 2.0 s threshold, while `/cmd_vel_nav` is silent for 2.5 to 2.75 s. Caveat: the `/cmd_vel_nav` fix was tuned on data from this same scenario, so 9/9 is not a fresh benchmark. A held-out scenario (other world, other pause lengths, two new fault targets, a no-fault control for false alarms) is prepared but has not been run.
+
 ## Why
 
 When Nav2 sits still, finding the cause means juggling `ros2 topic hz`, `tf2_echo`, `ros2 lifecycle get` and the logs. nav2_doctor runs those checks together. Pair it with [nav2_fault_inject](https://github.com/darshmenon/nav2_fault_inject) to break a stack on purpose and watch the doctor name the cause.
@@ -89,6 +105,6 @@ When Nav2 sits still, finding the cause means juggling `ros2 topic hz`, `tf2_ech
 - repeating recovery behaviours; AMCL covariance too high
 - a map-distortion check (`map->odom` yaw ramp); inert costmap filters are done (`FILTER_NO_MASK`, `FILTER_NO_INFO`)
 - multi-robot auto-discovery; ERROR lines from `/rosout` tied to the cause
-- a live Jazzy test, and a PyPI release (needs a trusted publisher on pypi.org; rclpy still comes from ROS, so a pip install alone cannot run it)
+- a live Jazzy test, and the first PyPI release (the workflow job is ready but off until a trusted publisher exists on pypi.org, see `.github/workflows/release.yml`)
 
 Build: `colcon build --packages-select nav2_doctor`. Tests: `python3 -m pytest test` (unit tests need no ROS; the integration tests run the real CLI against a fake Nav2 graph when ROS 2 is sourced).
