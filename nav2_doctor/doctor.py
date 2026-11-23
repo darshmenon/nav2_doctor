@@ -7,6 +7,7 @@ import argparse
 import json
 import math
 import re
+import sys
 import time
 from dataclasses import dataclass
 
@@ -208,6 +209,11 @@ class Doctor:
         self.seen('filter_info', now)
         self.filter_infos.setdefault(info_topic, {'mask': mask_topic, 'since': now})['mask'] = mask_topic
 
+    def cmd_nav(self, now):
+        """The controller's own output (/cmd_vel_nav). Downstream smoothers keep /cmd_vel alive for a while after the
+        controller dies, so a hung controller_server is only visible here."""
+        self.seen('cmd_vel_nav', now)
+
     def cmd(self, linear, angular, now):
         self.seen('cmd_vel', now)
         if abs(linear) > 1e-3 or abs(angular) > 1e-3:
@@ -341,6 +347,13 @@ class Doctor:
                 f.append(Finding('ERROR', 'NO_CMD_VEL', f'goal active but cmd_vel has been silent for {a:.1f}s - controller stopped producing output'))
             elif not moving:
                 f.append(Finding('ERROR', 'CMD_ZERO', 'goal active but cmd_vel is zero - planner/controller failed or path blocked'))
+            nav_a = self._age('cmd_vel_nav', now)
+            if nav_a is not None and not any(x.code == 'NO_CMD_VEL' for x in f):
+                if self.goal_since is not None:
+                    nav_a = min(nav_a, now - self.goal_since)   # a new goal gives the controller stale_s to start
+                if nav_a >= self.stale_s:
+                    f.append(Finding('ERROR', 'NO_CMD_VEL', f'goal active but the controller output (cmd_vel_nav) has been silent for {nav_a:.1f}s - '
+                                     'controller_server hung or paused (a smoother may still be repeating cmd_vel)'))
 
         if self.goal_active and self.goal_since is not None and now - self.goal_since >= self.progress_s:
             win = [p for p in self.poses if now - p[0] <= self.progress_s]
@@ -482,7 +495,13 @@ def diagnostics_topic(ns):
 
 
 def main(argv=None):
-    import rclpy
+    try:
+        import rclpy
+    except ImportError:
+        # `pip install nav2-doctor` brings the doctor but not rclpy: that only comes from a ROS 2 install
+        print('nav2_doctor needs a ROS 2 environment (rclpy was not found). Install ROS 2 Humble or Jazzy and run '
+              '`source /opt/ros/<distro>/setup.bash` first.', file=sys.stderr)
+        raise SystemExit(2)
     from rclpy.node import Node
     from rclpy.qos import qos_profile_sensor_data, QoSProfile
     from tf2_msgs.msg import TFMessage
@@ -612,6 +631,7 @@ def main(argv=None):
                              lambda m: d.map_msg(sum(1 for v in m.data if v == 0), clock()), mapq)
     node.create_subscription(Twist, f'{ns}/cmd_vel',
                              lambda m: d.cmd(m.linear.x, m.angular.z, clock()), sd)
+    node.create_subscription(Twist, f'{ns}/cmd_vel_nav', lambda m: d.cmd_nav(clock()), sd)
 
     seen_active, counted = set(), set()
 

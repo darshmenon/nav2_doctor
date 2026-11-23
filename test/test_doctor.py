@@ -597,3 +597,39 @@ def test_nan_amcl_covariance_is_uncertain_not_healthy():
     assert 'AMCL_UNCERTAIN' in c
     d = healthy(); d.amcl(0.01, 0.01, 0.5)
     assert 'AMCL_UNCERTAIN' not in codes(d, 1.0)
+
+
+def test_silent_controller_output_is_caught_even_while_the_smoother_keeps_cmd_vel_alive():
+    # scoreboard run 3 probe (2026-11-23): pausing controller_server 3 s silences /cmd_vel_nav for ~2.7 s, but
+    # velocity_smoother keeps /cmd_vel going ~1.2 s longer, so /cmd_vel itself is silent < stale_s (2.0 s) and was missed.
+    d = healthy(); d.goal_active = True; d.goal_since = 0.0
+    d.cmd_nav(1.0)                                       # controller's last output
+    d.cmd(0.3, 0, 2.2)                                   # smoother still repeating it
+    d.tf('map', 'odom', 3.6); d.tf('odom', 'base_link', 3.6); d.seen('odom', 3.6); d.seen('scan', 3.6)
+    assert 'NO_CMD_VEL' in codes(d, 3.6)                 # /cmd_vel age 1.4 s (< 2.0) but controller output age 2.6 s
+    d.cmd_nav(3.5)                                       # controller resumed
+    assert 'NO_CMD_VEL' not in codes(d, 3.6)
+
+
+def test_controller_output_check_stays_quiet_without_cmd_vel_nav_or_right_after_a_new_goal():
+    d = healthy(); d.goal_active = True; d.goal_since = 0.0
+    d.cmd(0.3, 0, 3.4)                                   # stack that never publishes /cmd_vel_nav: no extra finding
+    d.tf('map', 'odom', 3.5); d.tf('odom', 'base_link', 3.5); d.seen('odom', 3.5); d.seen('scan', 3.5)
+    assert 'NO_CMD_VEL' not in codes(d, 3.5)
+    d2 = healthy(); d2.cmd_nav(0.0); d2.cmd(0.3, 0, 3.4)
+    d2.goal_active = True; d2.goal_since = 3.0           # a new goal 0.5 s ago: the controller has not started yet
+    d2.tf('map', 'odom', 3.5); d2.tf('odom', 'base_link', 3.5); d2.seen('odom', 3.5); d2.seen('scan', 3.5)
+    assert 'NO_CMD_VEL' not in codes(d2, 3.5)
+
+
+def test_missing_ros_gives_a_readable_error_not_a_traceback(monkeypatch, capsys):
+    # a pip install gets the doctor but not rclpy (that comes from the ROS install): say so instead of ModuleNotFoundError
+    import sys
+    import pytest
+    from nav2_doctor import doctor
+    monkeypatch.setitem(sys.modules, 'rclpy', None)       # makes `import rclpy` raise ImportError
+    with pytest.raises(SystemExit) as e:
+        doctor.main([])
+    assert e.value.code == 2
+    err = capsys.readouterr().err
+    assert 'ROS 2' in err and 'setup.bash' in err
