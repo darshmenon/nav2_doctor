@@ -49,6 +49,8 @@ ERROR [COSTMAP_STALE] local costmap not updating (3.8s) - usually a TF or scan p
 | `AMCL_UNCERTAIN` | warn | `/amcl_pose` covariance above 0.5 m^2, so the robot is poorly localised |
 | `NO_PROGRESS` | warn | a goal is active but odometry shows the robot hasn't moved (15 s, 0.1 m by default) |
 | `RATE_DROP` / `RATE_SPIKE` | warn | with `--baseline`: a stream runs below half or above double the rate learned by `--learn` |
+| `FILTER_BAD_LIMIT` / `FILTER_MOSTLY_SLOW` | warn | a speed mask has cells Nav2 reads as no limit, or half of it is below 25% speed (often an inverted mask) |
+| `FILTER_BELOW_MIN_SPEED` | warn | a speed mask can limit DWB's max speed under its minimum speed, so motions (or all samples) are rejected |
 | `CMD_ZERO` / `NO_CMD_VEL` | error | a goal is active but `cmd_vel` is zero or absent |
 
 Checked servers: `controller_server`, `planner_server`, `bt_navigator`, `behavior_server`, `smoother_server`, `waypoint_follower`. Verified on Humble against a live Gazebo sim (a frozen bridge is caught within about 3 s and clears on recovery) and in CI on Humble and Jazzy against a fake Nav2 graph.
@@ -87,7 +89,10 @@ Measured with [nav2_fault_inject](https://github.com/darshmenon/nav2_fault_injec
 | 2 | after the `CMD_ZERO` vs `NO_CMD_VEL` fix | 6/9 (all three `NO_CMD_VEL` missed) |
 | 4 | after also watching `/cmd_vel_nav` | 9/9 |
 
-The run 2 misses were measured: a 3 s `controller_server` pause leaves `/cmd_vel` silent for only 1.25 to 1.75 s (the velocity smoother keeps repeating), under the 2.0 s threshold, while `/cmd_vel_nav` is silent for 2.5 to 2.75 s. Caveat: the `/cmd_vel_nav` fix was tuned on data from this same scenario, so 9/9 is not a fresh benchmark. A held-out scenario (other world, other pause lengths, two new fault targets, a no-fault control for false alarms) is prepared but has not been run.
+The run 2 misses were measured: a 3 s `controller_server` pause leaves `/cmd_vel` silent for only 1.25 to 1.75 s (the velocity smoother keeps repeating), under the 2.0 s threshold, while `/cmd_vel_nav` is silent for 2.5 to 2.75 s. Caveat: the `/cmd_vel_nav` fix was tuned on data from this same scenario, so 9/9 is not a fresh benchmark. 
+**Held-out run (2026-11-23, cafe world, other pause lengths, two new targets, nothing tuned on it): 7/9.** `slam_toolbox` and `parameter_bridge` 4/4, `velocity_smoother` and `ekf_filter_node` 3/3, the 2.5 s `controller_server` pauses 0/2. The 200 s no-fault control before it gave no errors or warnings in 199 reports (a small sample).
+
+Since then the controller check expects `/cmd_vel_nav` only while the behaviour tree says `FollowPath` is running, because recovery behaviours publish straight to `/cmd_vel` (the earlier check would have called that a hung controller), and uses a 1.0 s threshold then (2.0 s if no BT log is seen). That change is unit-tested; since it was motivated by the 7/9 misses it needs a fresh scenario before any new score is quoted.
 
 ## Why
 

@@ -9,6 +9,7 @@ import math
 import re
 import sys
 import time
+from collections import Counter
 from dataclasses import dataclass
 
 __version__ = '0.7.0'
@@ -16,6 +17,7 @@ __version__ = '0.7.0'
 NAV2_NODES = ['controller_server', 'planner_server', 'bt_navigator',
               'behavior_server', 'smoother_server', 'waypoint_follower']
 STALE_S = 2.0          # a stream is "stale" if silent this long
+NAV_STALE_S = 1.0      # controller output silence while FollowPath runs (controllers publish at ~20 Hz)
 FLAP_WINDOW_S = 30.0   # goal-flapping look-back
 STARTUP_S = 60.0       # grace period before inactive nodes count as errors
 FLAP_COUNT = 4         # goals cancelled/aborted inside the window => flapping
@@ -60,6 +62,9 @@ HINTS = {
     'INFLATION_SMALL': 'raise inflation_layer.inflation_radius above robot_radius (or footprint circumradius)',
     'RECOVERY_LOOP': 'find what keeps failing planning/control: read planner/controller logs, check costmap for phantom obstacles, loosen goal tolerance',
     'FILTER_NO_MASK': 'start nav2_map_server for the filter mask (and make it active in the lifecycle manager); `ros2 topic info <mask topic> -v` shows the publisher',
+    'FILTER_BAD_LIMIT': 'check the mask encoding and base/multiplier: in map_server scale mode black pixels are 100 and white are 0',
+    'FILTER_BELOW_MIN_SPEED': 'raise the mask speed floor to at least min_speed/max_speed (for both xy and theta), or lower DWB min_speed_xy / min_speed_theta',
+    'FILTER_MOSTLY_SLOW': 'view the mask in RViz; in map_server scale mode black pixels are 100 and white are 0, so a mask written the other way round slows free ground',
     'FILTER_NO_INFO': 'start the costmap_filter_info_server (and add it to the lifecycle manager); the filter in the costmap `filters` list has nothing to read',
     'LOG_NO_PROGRESS': 'controller_server logged "Failed to make progress": check goal/progress checker tolerances, an obstacle in front, and that cmd_vel reaches the base',
     'LOG_SENSOR_OUT_OF_BOUNDS': 'a sensor origin is outside the costmap, so it cannot raytrace: enlarge the costmap, or check the sensor frame height and TF',
@@ -83,6 +88,8 @@ LOG_PATTERNS = (
 LOG_NODES = ('controller_server', 'planner_server', 'bt_navigator', 'behavior_server', 'smoother_server',
              'waypoint_follower', 'local_costmap', 'global_costmap', 'amcl', 'velocity_smoother')
 LOG_WINDOW_S = 30.0
+SLOW_PCT = 25       # a speed-mask cell limited below this percentage counts as "slow"
+SLOW_SHARE = 0.5    # warn when at least this share of the mask is slow
 
 
 def classify_log(msg):
@@ -136,6 +143,9 @@ class Doctor:
                  flap_count=FLAP_COUNT, progress_s=PROGRESS_S, progress_m=PROGRESS_M, progress_yaw=PROGRESS_YAW):
         self.startup_s = startup_s
         self.stale_s = stale_s
+        self.nav_stale_s = NAV_STALE_S
+        self.follow_running = None   # None until the BT log has mentioned FollowPath
+        self.follow_since = None
         self.flap_window_s = flap_window_s
         self.flap_count = flap_count
         self.progress_s = progress_s
@@ -166,6 +176,9 @@ class Doctor:
         self.filter_infos = {}      # CostmapFilterInfo topic -> {'mask': mask topic, 'since': first seen}
         self.filter_mask_seen = set()   # mask topics a message was received on
         self.filter_pubs = {}       # mask topic -> number of publishers
+        self.filter_stats = {}      # speed mask topic -> (fraction invalid, fraction below SLOW_PCT)
+        self.filter_min_limit = {}  # percent speed mask topic -> lowest limit it can set (%)
+        self.dwb = {}               # DWB max/min speed parameters of the controller
         self.filters_configured = []    # names in the costmap `filters` parameter
         self.filter_info_pubs = None    # publishers on the CostmapFilterInfo topics (None = unknown)
         self.logs = {}              # LOG_* code -> [message, [times]]
@@ -204,10 +217,47 @@ class Doctor:
         """A /tf_static edge (e.g. a fixed map->odom when localization is static): counts as present, never stale."""
         self.static_edges.add((parent.lstrip('/'), child.lstrip('/')))
 
-    def filter_info(self, info_topic, mask_topic, now):
+    def filter_mask(self, topic, data, info_topic):
+        """Check a speed filter's mask values: Nav2 turns each non-zero cell into `base + multiplier * value`."""
+        self.filter_mask_seen.add(topic)
+        fi = self.filter_infos.get(info_topic, {})
+        if fi.get('type') not in (1, 2):    # 1 = speed in percent, 2 = absolute m/s; keepout masks have nothing to grade
+            return
+        counts = Counter(v for v in data if v >= 0)
+        total = sum(counts.values())
+        if not total:
+            return
+        if fi['type'] == 1:
+            limits = [fi['base'] + fi['multiplier'] * v for v in counts if v]
+            limits = [x for x in limits if 0 < x <= 100]
+            if limits:
+                self.filter_min_limit[topic] = min(limits)
+            else:
+                self.filter_min_limit.pop(topic, None)
+        invalid = slow = 0
+        for value, n in counts.items():
+            if value == 0:
+                continue
+            speed = fi['base'] + fi['multiplier'] * value
+            if speed <= 0 or (fi['type'] == 1 and speed > 100):
+                invalid += n
+            elif fi['type'] == 1 and speed < SLOW_PCT:
+                slow += n
+        self.filter_stats[topic] = (invalid / total, slow / total)
+
+    def filter_info(self, info_topic, mask_topic, now, ftype=None, base=0.0, multiplier=1.0):
         """A costmap filter info message (nav2_msgs/CostmapFilterInfo): says which topic carries the filter mask."""
         self.seen('filter_info', now)
-        self.filter_infos.setdefault(info_topic, {'mask': mask_topic, 'since': now})['mask'] = mask_topic
+        fi = self.filter_infos.setdefault(info_topic, {'mask': mask_topic, 'since': now})
+        fi.update(mask=mask_topic, type=ftype, base=base, multiplier=multiplier)
+
+    def bt_status(self, node_name, status, now):
+        """A behaviour tree status change. Controller output is only expected while FollowPath is RUNNING."""
+        if node_name == 'FollowPath':
+            running = status == 'RUNNING'
+            if running and not self.follow_running:
+                self.follow_since = now
+            self.follow_running = running
 
     def cmd_nav(self, now):
         """The controller's own output (/cmd_vel_nav). Downstream smoothers keep /cmd_vel alive for a while after the
@@ -348,10 +398,15 @@ class Doctor:
             elif not moving:
                 f.append(Finding('ERROR', 'CMD_ZERO', 'goal active but cmd_vel is zero - planner/controller failed or path blocked'))
             nav_a = self._age('cmd_vel_nav', now)
-            if nav_a is not None and not any(x.code == 'NO_CMD_VEL' for x in f):
-                if self.goal_since is not None:
-                    nav_a = min(nav_a, now - self.goal_since)   # a new goal gives the controller stale_s to start
-                if nav_a >= self.stale_s:
+            # follow_running False: a recovery or replanning, the controller is not meant to publish
+            if nav_a is not None and self.follow_running is not False and not any(x.code == 'NO_CMD_VEL' for x in f):
+                if self.follow_running:      # known from the BT log: the shorter threshold is safe
+                    since, limit = self.follow_since, self.nav_stale_s
+                else:                        # no BT log seen: conservative, a new goal gets stale_s to start
+                    since, limit = self.goal_since, self.stale_s
+                if since is not None:
+                    nav_a = min(nav_a, now - since)
+                if nav_a >= limit:
                     f.append(Finding('ERROR', 'NO_CMD_VEL', f'goal active but the controller output (cmd_vel_nav) has been silent for {nav_a:.1f}s - '
                                      'controller_server hung or paused (a smoother may still be repeating cmd_vel)'))
 
@@ -423,6 +478,27 @@ class Doctor:
                 f.append(Finding('WARN', 'FILTER_NO_MASK',
                                  f'costmap filter {info} points at mask topic {mask} but nothing publishes it - '
                                  'the filter is inert (keepout / speed zones are not applied)'))
+        for mask, (invalid, slow) in self.filter_stats.items():
+            if invalid > 0:
+                f.append(Finding('WARN', 'FILTER_BAD_LIMIT',
+                                 f'speed mask {mask}: {100 * invalid:.0f}% of cells give a limit outside (0, 100], '
+                                 'which Nav2 treats as no limit'))
+            if slow >= SLOW_SHARE:
+                f.append(Finding('WARN', 'FILTER_MOSTLY_SLOW',
+                                 f'speed mask {mask}: {100 * slow:.0f}% of cells are limited below {SLOW_PCT}% speed '
+                                 '(inverted mask?)'))
+        for mask, pct in self.filter_min_limit.items():
+            blocked = []
+            for hi, lo, what in (('max_speed_xy', 'min_speed_xy', 'drive slower than'),
+                                 ('max_vel_theta', 'min_speed_theta', 'turn slower than')):
+                top, bottom = self.dwb.get(hi), self.dwb.get(lo)
+                if top and bottom and top > 0 and top * pct / 100.0 < bottom - 1e-6:
+                    blocked.append(f'{hi} drops to {top * pct / 100.0:.3f}, under {lo} {bottom:g}')
+            if blocked:     # DWB scales the max speeds with the limit but never the min speeds
+                both = len(blocked) == 2
+                f.append(Finding('WARN', 'FILTER_BELOW_MIN_SPEED',
+                                 f'speed mask {mask} can limit to {pct:.0f}%: ' + '; '.join(blocked)
+                                 + (' - DWB rejects every sample there' if both else ' - DWB loses motions there')))
         if (self.filters_configured and not self.filter_infos and self.filter_info_pubs == 0
                 and self.started is not None and now - self.started >= self.startup_s):
             f.append(Finding('WARN', 'FILTER_NO_INFO',
@@ -654,6 +730,7 @@ def main(argv=None):
 
         def on_bt(m):
             for e in m.event_log:
+                d.bt_status(e.node_name, e.current_status, clock())
                 if e.current_status == 'RUNNING' and e.previous_status != 'RUNNING':
                     d.recovery(e.node_name, clock())
         node.create_subscription(BehaviorTreeLog, f'{ns}/behavior_tree_log', on_bt, rel)
@@ -699,6 +776,23 @@ def main(argv=None):
         param_cli.call_async(req).add_done_callback(done)
     node.create_timer(10.0, poll_params)
 
+    dwb_cli = node.create_client(GetParameters, f'{ns}/controller_server/get_parameters')
+    dwb_keys = ('max_speed_xy', 'min_speed_xy', 'max_vel_theta', 'min_speed_theta')
+
+    def poll_dwb():
+        if not dwb_cli.service_is_ready():
+            return
+
+        def done(f):
+            try:
+                vals = f.result().values
+            except Exception:
+                return
+            # a non-DWB controller has no such parameters (type 0): the check then stays quiet
+            d.dwb = {k: v.double_value for k, v in zip(dwb_keys, vals) if v.type == 3}
+        dwb_cli.call_async(GetParameters.Request(names=[f'FollowPath.{k}' for k in dwb_keys])).add_done_callback(done)
+    node.create_timer(10.0, poll_dwb)
+
     # costmap filters (keepout, speed zones): find the CostmapFilterInfo topics, then check each mask has a publisher
     filter_subs = {}
     try:
@@ -716,10 +810,10 @@ def main(argv=None):
                 def on_info(m, t=t):
                     mask = m.filter_mask_topic
                     mask = mask if mask.startswith('/') or not mask else f'{ns}/{mask}'
-                    d.filter_info(t, mask, clock())
+                    d.filter_info(t, mask, clock(), m.type, m.base, m.multiplier)
                     if mask and mask not in filter_subs:
                         filter_subs[mask] = node.create_subscription(
-                            OccupancyGrid, mask, lambda _m, mask=mask: d.filter_mask_seen.add(mask), mapq)
+                            OccupancyGrid, mask, lambda g, mask=mask, t=t: d.filter_mask(mask, g.data, t), mapq)
                 filter_subs[t] = node.create_subscription(CostmapFilterInfo, t, on_info, mapq)
         for info in d.filter_infos.values():
             if info['mask']:

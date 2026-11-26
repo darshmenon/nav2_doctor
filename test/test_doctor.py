@@ -633,3 +633,80 @@ def test_missing_ros_gives_a_readable_error_not_a_traceback(monkeypatch, capsys)
     assert e.value.code == 2
     err = capsys.readouterr().err
     assert 'ROS 2' in err and 'setup.bash' in err
+
+
+def _driving(d, now):
+    d.tf('map', 'odom', now); d.tf('odom', 'base_link', now); d.seen('odom', now); d.seen('scan', now)
+    d.cmd(0.3, 0, now - 0.05)
+
+
+def test_recovery_behaviour_silencing_cmd_vel_nav_is_not_a_hung_controller():
+    # spin / backup publish straight to /cmd_vel, so /cmd_vel_nav is quiet for seconds while all is well
+    d = healthy(); d.goal_active = True; d.goal_since = 0.0
+    d.bt_status('FollowPath', 'RUNNING', 1.0); d.cmd_nav(4.0)
+    d.bt_status('FollowPath', 'FAILURE', 4.1); d.bt_status('Spin', 'RUNNING', 4.2)
+    _driving(d, 9.0)
+    assert 'NO_CMD_VEL' not in codes(d, 9.0)
+
+
+def test_short_controller_stall_is_caught_while_follow_path_is_running():
+    d = healthy(); d.goal_active = True; d.goal_since = 0.0
+    d.bt_status('FollowPath', 'RUNNING', 1.0); d.cmd_nav(5.0)
+    _driving(d, 6.2)
+    assert 'NO_CMD_VEL' in codes(d, 6.2)                 # 1.2 s of silence: over the 1.0 s controller threshold
+    d.cmd_nav(6.25); _driving(d, 6.5)
+    assert 'NO_CMD_VEL' not in codes(d, 6.5)
+
+
+def test_follow_path_restart_gets_a_grace_period():
+    d = healthy(); d.goal_active = True; d.goal_since = 0.0
+    d.cmd_nav(2.0); d.bt_status('FollowPath', 'RUNNING', 9.5)   # restarted 0.5 s ago, last output long ago
+    _driving(d, 10.0)
+    assert 'NO_CMD_VEL' not in codes(d, 10.0)
+
+
+def test_without_bt_log_the_controller_check_keeps_the_conservative_threshold():
+    d = healthy(); d.goal_active = True; d.goal_since = 0.0
+    d.cmd_nav(5.0); _driving(d, 6.2)
+    assert 'NO_CMD_VEL' not in codes(d, 6.2)
+    _driving(d, 7.2)
+    assert 'NO_CMD_VEL' in codes(d, 7.2)
+
+
+def _speed_mask(data):
+    d = healthy(); d.filter_info('/speed_info', '/speed_mask', 0.0, ftype=1, base=100.0, multiplier=-1.0)
+    d.filter_mask('/speed_mask', data, '/speed_info')
+    return codes(d, 1.0)
+
+
+def test_inverted_speed_mask_is_flagged():
+    assert 'FILTER_MOSTLY_SLOW' in _speed_mask([82] * 90 + [0] * 10)
+
+
+def test_speed_limit_of_zero_is_flagged_as_no_limit():
+    assert 'FILTER_BAD_LIMIT' in _speed_mask([100] * 5 + [0] * 95)
+
+
+def test_sane_speed_mask_and_keepout_mask_are_quiet():
+    found = _speed_mask([0] * 80 + [40] * 15 + [80] * 5 + [-1] * 3)
+    assert 'FILTER_BAD_LIMIT' not in found and 'FILTER_MOSTLY_SLOW' not in found
+    d = healthy(); d.filter_info('/k', '/km', 0.0, ftype=0)
+    d.filter_mask('/km', [100] * 10, '/k')
+    assert not d.filter_stats
+
+
+DWB = {'max_speed_xy': 0.15, 'min_speed_xy': 0.08, 'max_vel_theta': 0.4, 'min_speed_theta': 0.3}
+
+
+def _limit(value, dwb=DWB):
+    d = healthy(); d.dwb = dwb
+    d.filter_info('/speed_info', '/speed_mask', 0.0, ftype=1, base=100.0, multiplier=-1.0)
+    d.filter_mask('/speed_mask', [0] * 90 + [value] * 10, '/speed_info')
+    return [x for x in d.diagnose(1.0) if x.code == 'FILTER_BELOW_MIN_SPEED']
+
+
+def test_speed_limit_under_dwb_minimums():
+    assert 'rejects every sample' in _limit(95)[0].msg          # 5%
+    assert 'loses motions' in _limit(40)[0].msg                 # 60%: turning only
+    assert not _limit(20)                                       # 80%
+    assert not _limit(95, dwb={})                               # not DWB: say nothing

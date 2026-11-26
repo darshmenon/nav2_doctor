@@ -1,7 +1,12 @@
 # Changelog
 
 ## Unreleased
-- Tests: 115 unit and integration tests pass (without the sim test), 2026-11-23.
+- New `FILTER_BELOW_MIN_SPEED`: compares the lowest percent limit in a speed mask with DWB `min_speed_xy` / `min_speed_theta`. From reading the Humble DWB source (min speeds are not scaled). Unit-tested, not yet run live.
+- New `FILTER_BAD_LIMIT` / `FILTER_MOSTLY_SLOW`: grade speed-filter mask values with the filter's base/multiplier. Added after finding inverted speed masks (`map_server` scale mode reads black as 100). Unit-tested.
+- Fix: no `NO_CMD_VEL` from the `/cmd_vel_nav` check while a recovery behaviour is driving (`FollowPath` not running).
+- The controller output threshold is 1.0 s while `FollowPath` is running (2.0 s without a BT log). Held-out run with the previous check: 7/9, both misses 2.5 s controller pauses; the new threshold is not yet scored on a fresh scenario.
+- Tests: 124 tests pass, 2026-11-26.
+- Earlier run: 115 unit and integration tests pass (without the sim test), 2026-11-23.
 - Fault-injection scoreboard (README): run 1 6/9, run 2 6/9, run 4 9/9 after the `/cmd_vel_nav` check. The 9/9 is not a fresh benchmark, the fix was tuned on the same scenario; a held-out run is still to do.
 - PyPI prep: `release.yml` has the `pypi` job back, but gated on the repo variable `PYPI_PUBLISH == 'true'` so tags do not fail before pypi.org has a trusted publisher. README gets an Install section (rclpy comes from ROS, not PyPI), and running without ROS now prints a one-line message and exits 2 instead of a `ModuleNotFoundError` traceback.
 - Fix: a hung or paused `controller_server` is now caught even when a velocity smoother keeps `/cmd_vel` alive. The doctor also watches the controller's own output `/cmd_vel_nav` and reports `NO_CMD_VEL` when it has been silent for the stale threshold while a goal is active (a new goal gets that long to start). Measured on a maze sim: a 3 s controller pause left `/cmd_vel` silent for only 1.25 to 1.75 s (under the 2.0 s threshold, so it was missed 3 of 3 times) but `/cmd_vel_nav` silent for 2.5 to 2.75 s (0.25 s bins). Unit tests only so far, not yet re-run live.
