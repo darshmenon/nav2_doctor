@@ -40,6 +40,7 @@ ERROR [COSTMAP_STALE] local costmap not updating (3.8s) - usually a TF or scan p
 |---|---|---|
 | `TF_NONE` / `TF_FREEZE` | error | no `/tf` at all, or `/tf` silent for more than 2 s |
 | `TF_EDGE_STALE` | error | one transform stopped while other TF is alive (a dead publisher) |
+| `CLOCK_STALLED` | error | `/clock` was publishing and has gone silent (simulator paused or its bridge stopped) |
 | `NO_MAP_ODOM` | warn | no `map->odom`, so SLAM or AMCL isn't localising |
 | `ODOM_STALE` / `SCAN_STALE` | error | odometry or laser scan went silent (`*_NONE` warns when never seen) |
 | `COSTMAP_STALE` | error | the local costmap stopped updating |

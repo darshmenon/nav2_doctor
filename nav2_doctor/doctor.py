@@ -58,6 +58,7 @@ HINTS = {
     'SCAN_TF_AHEAD': 'TF is lagging the laser (slow sim / overloaded TF publisher): consumers doing lookup at the scan stamp fail with "extrapolation into the future" - slow the sim down, fix the TF source rate, or let consumers fall back to the latest transform',
     'IDLE_NO_GOALS': 'the goal source (explorer / mission node) may have quit early - check its log for "exploration complete" or filtered frontiers',
     'CMD_NO_MOTION': 'check e-stop, motor enable and that the driver converts cmd_vel; `ros2 topic echo /odom`',
+    'CLOCK_STALLED': 'check that the simulator is unpaused and the /clock bridge is running',
     'CLOCK_SKEW': 'sync clocks (chrony) or set use_sim_time consistently on every node',
     'INFLATION_SMALL': 'raise inflation_layer.inflation_radius above robot_radius (or footprint circumradius)',
     'RECOVERY_LOOP': 'find what keeps failing planning/control: read planner/controller logs, check costmap for phantom obstacles, loosen goal tolerance',
@@ -166,6 +167,7 @@ class Doctor:
         self.cmd_since = None       # start of the current run of non-zero cmd_vel
         self.cmd_subscribers = None  # other nodes subscribed to cmd_vel (None = unknown)
         self.skew = None            # worst recent |TF stamp - clock| in seconds
+        self.sim_clock_t = None     # last time /clock arrived; stays None without a simulator
         self.recoveries = []        # times a recovery behaviour started
         self.params = {}            # costmap params: inflation_radius, robot_radius
         self.map_hist = []          # (time, free_cells) per /map message
@@ -192,6 +194,9 @@ class Doctor:
         a.append(now)
         if len(a) > ARRIVALS_KEEP:
             del a[:len(a) - ARRIVALS_KEEP]
+
+    def sim_clock(self, now):
+        self.sim_clock_t = now
 
     def amcl(self, var_x, var_y, now):
         self.seen('amcl', now)
@@ -455,6 +460,11 @@ class Doctor:
                              f'cmd_vel active {active}s of the last {MAP_WIN_S:.0f}s but /map free cells '
                              f'went {win[0][1]} -> {win[-1][1]} - SLAM is not integrating scans'))
 
+        if self.sim_clock_t is not None and now - self.sim_clock_t > max(self.stale_s, SIM_CLOCK_FRESH_S):
+            f.append(Finding('ERROR', 'CLOCK_STALLED',
+                             f'/clock silent for {now - self.sim_clock_t:.1f}s - simulator paused, frozen or '
+                             'its bridge stopped; every use_sim_time node is stuck'))
+
         if self.skew is not None and self.skew > SKEW_S:
             f.append(Finding('WARN', 'CLOCK_SKEW',
                              f'/tf stamps differ from this machine\'s clock by {self.skew:.1f}s - clock skew or '
@@ -524,10 +534,11 @@ SIM_CLOCK_FRESH_S = 2.0   # a /clock message newer than this means a simulator i
 
 
 def reference_time(wall_now, sim_time=None, sim_age=None):
-    """Time that TF stamps should be compared with: sim time while /clock is live, else the wall clock."""
-    if sim_time is not None and sim_age is not None and sim_age < SIM_CLOCK_FRESH_S:
-        return sim_time
-    return wall_now
+    """Time that TF stamps should be compared with: the wall clock without /clock, sim time while it is live,
+    and None once it has gone quiet (sim stamps cannot be compared with either then)."""
+    if sim_time is None or sim_age is None:
+        return wall_now
+    return sim_time if sim_age < SIM_CLOCK_FRESH_S else None
 
 
 def tf_belongs_to(ns, parent, child):
@@ -652,6 +663,7 @@ def main(argv=None):
     def on_clock(m):
         sim_clock['t'] = m.clock.sec + m.clock.nanosec / 1e9
         sim_clock['seen'] = time.monotonic()
+        d.sim_clock(clock())
 
     def now_ref():
         # Under Gazebo the stamps are sim time, so compare against /clock, not the wall clock
@@ -666,8 +678,9 @@ def main(argv=None):
                 continue
             st = t.header.stamp
             skew = None
-            if st.sec or st.nanosec:   # zero stamp = unstamped, nothing to compare
-                skew = now_ref() - (st.sec + st.nanosec / 1e9)
+            ref = now_ref()
+            if ref is not None and (st.sec or st.nanosec):   # zero stamp = unstamped, nothing to compare
+                skew = ref - (st.sec + st.nanosec / 1e9)
             d.tf(t.header.frame_id, t.child_frame_id, clock(), skew)
             if t.child_frame_id.lstrip('/').endswith('base_link') and t.header.frame_id.lstrip('/').endswith('odom') \
                     and (st.sec or st.nanosec):

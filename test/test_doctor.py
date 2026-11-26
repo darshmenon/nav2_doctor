@@ -528,7 +528,18 @@ def test_reference_time_uses_sim_clock_only_while_it_is_live():
     from nav2_doctor.doctor import reference_time
     assert reference_time(1.8e9) == 1.8e9                         # no /clock: wall clock
     assert reference_time(1.8e9, sim_time=42.0, sim_age=0.5) == 42.0   # sim running: stamps are sim time
-    assert reference_time(1.8e9, sim_time=42.0, sim_age=5.0) == 1.8e9  # /clock went quiet: back to wall
+    assert reference_time(1.8e9, sim_time=42.0, sim_age=5.0) is None   # /clock went quiet: nothing to compare
+
+
+def test_frozen_sim_clock_reports_stalled_not_skew():
+    d = healthy()
+    assert 'CLOCK_STALLED' not in codes(d, 1.0)       # no /clock at all (real robot)
+    d.sim_clock(1.0)
+    assert 'CLOCK_STALLED' not in codes(d, 1.5)
+    found = codes(d, 30.0)
+    assert 'CLOCK_STALLED' in found and 'CLOCK_SKEW' not in found
+    d.sim_clock(30.0)
+    assert 'CLOCK_STALLED' not in codes(d, 30.0)      # clears when the sim resumes
 
 
 def test_sim_stamps_do_not_raise_clock_skew_but_wall_stamps_under_sim_do():
