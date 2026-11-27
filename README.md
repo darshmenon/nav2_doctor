@@ -12,9 +12,26 @@
 
 Born in [rosnav](https://github.com/darshmenon/rosnav), a ROS 2 Nav2 stack with SLAM, frontier exploration and multi-robot fleets; rosnav ships this as `scripts/nav2_doctor.py` and tested it on its live Gazebo maze sim.
 
+Part of [ros2-doctor-tools](https://github.com/darshmenon/ros2-doctor-tools), an index of my ROS 2 diagnosis, fault injection and evaluation tools.
+
 ## Install
 
-nav2_doctor needs a ROS 2 environment (Humble or Jazzy): `rclpy` comes from the ROS install, not from PyPI. Source ROS first (`source /opt/ros/<distro>/setup.bash`), then either build it in a colcon workspace (below) or, once published, `pip install nav2-doctor` into that same environment. Without ROS the command prints a short message and exits with code 2.
+nav2_doctor needs a ROS 2 environment (Humble or Jazzy): `rclpy` comes from the ROS install, not from PyPI. Source ROS first (`source /opt/ros/<distro>/setup.bash`), then either install it with pip into that same environment or build it in a colcon workspace. Without ROS the command prints a short message and exits with code 2.
+
+```bash
+# ROS 2 sourced; if you use a venv, create it with --system-site-packages
+pip install git+https://github.com/darshmenon/nav2_doctor
+nav2_doctor --help
+```
+
+A pip install puts the `nav2_doctor` command on your PATH; run it directly. The `ros2 run` form needs the colcon build.
+
+Or with colcon:
+
+```bash
+cd ~/ros2_ws/src && git clone https://github.com/darshmenon/nav2_doctor.git
+cd .. && colcon build --packages-select nav2_doctor && source install/setup.bash
+```
 
 ## Quick start
 
