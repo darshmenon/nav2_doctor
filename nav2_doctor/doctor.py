@@ -27,6 +27,7 @@ PROGRESS_M = 0.1       # minimum displacement (m) that counts as movement
 PROGRESS_YAW = 0.2     # minimum heading change (rad) that counts as movement (rotating in place)
 MAP_WIN_S = 60.0       # window for MAP_STALL
 MAP_ACTIVE_S = 10.0    # seconds of non-zero cmd_vel in the window before an unchanged map is suspicious
+MAP_RESET_CELLS = 500    # free cells lost at once (and over half the map) = a reset, not a stall
 SCAN_LEAD_S = 0.5      # scan stamps this far ahead of the newest odom TF => SCAN_TF_AHEAD
 IDLE_S = 45.0          # stack up this long, no goal ever seen and robot never commanded => IDLE_NO_GOALS
 DRIVE_S = 5.0         # cmd_vel non-zero this long with no odom movement => CMD_NO_MOTION
@@ -55,6 +56,7 @@ HINTS = {
     'AMCL_UNCERTAIN': 'publish /initialpose in RViz, check the map matches the world, and that /scan is reaching AMCL',
     'NO_CMD_SUBSCRIBER': 'remap: `ros2 topic info /cmd_vel -v`; match the driver topic (cmd_vel_smoothed, velocity_smoother)',
     'MAP_STALL': 'SLAM gets no usable scans: check scan->odom TF errors ("extrapolation"), the scan topic/frame and that SLAM subscribes to the right /scan',
+    'SCAN_FRAME_NO_TF': 'publish the lidar mount transform (static_transform_publisher / robot_state_publisher) from base_link to the scan frame_id; compare with `ros2 run tf2_tools view_frames`',
     'SCAN_TF_AHEAD': 'TF is lagging the laser (slow sim / overloaded TF publisher): consumers doing lookup at the scan stamp fail with "extrapolation into the future" - slow the sim down, fix the TF source rate, or let consumers fall back to the latest transform',
     'IDLE_NO_GOALS': 'the goal source (explorer / mission node) may have quit early - check its log for "exploration complete" or filtered frontiers',
     'CMD_NO_MOTION': 'check e-stop, motor enable and that the driver converts cmd_vel; `ros2 topic echo /odom`',
@@ -66,6 +68,7 @@ HINTS = {
     'FILTER_BAD_LIMIT': 'check the mask encoding and base/multiplier: in map_server scale mode black pixels are 100 and white are 0',
     'FILTER_BELOW_MIN_SPEED': 'raise the mask speed floor to at least min_speed/max_speed (for both xy and theta), or lower DWB min_speed_xy / min_speed_theta',
     'FILTER_MOSTLY_SLOW': 'view the mask in RViz; in map_server scale mode black pixels are 100 and white are 0, so a mask written the other way round slows free ground',
+    'SPEED_LIMIT_UNHEARD': 'set controller_server `speed_limit_topic` to the topic the SpeedFilter publishes (its `speed_limit_topic`); check with `ros2 topic info <topic> -v`',
     'FILTER_NO_INFO': 'start the costmap_filter_info_server (and add it to the lifecycle manager); the filter in the costmap `filters` list has nothing to read',
     'LOG_NO_PROGRESS': 'controller_server logged "Failed to make progress": check goal/progress checker tolerances, an obstacle in front, and that cmd_vel reaches the base',
     'LOG_SENSOR_OUT_OF_BOUNDS': 'a sensor origin is outside the costmap, so it cannot raytrace: enlarge the costmap, or check the sensor frame height and TF',
@@ -173,6 +176,7 @@ class Doctor:
         self.map_hist = []          # (time, free_cells) per /map message
         self.cmd_secs = set()       # whole seconds in which cmd_vel was non-zero
         self.scan_stamp = None      # newest scan header stamp (s)
+        self.scan_frame = None      # frame_id of the newest scan
         self.tf_stamp = None        # newest odom->base TF header stamp (s)
         self.ever_goal = False      # a goal was ever active/cancelled/aborted
         self.filter_infos = {}      # CostmapFilterInfo topic -> {'mask': mask topic, 'since': first seen}
@@ -181,6 +185,8 @@ class Doctor:
         self.filter_stats = {}      # speed mask topic -> (fraction invalid, fraction below SLOW_PCT)
         self.filter_min_limit = {}  # percent speed mask topic -> lowest limit it can set (%)
         self.dwb = {}               # DWB max/min speed parameters of the controller
+        self.speed_unheard = {}     # speed limit topic controller_server misses -> first seen
+        self.speed_heard = []       # speed limit topics controller_server does subscribe to
         self.filters_configured = []    # names in the costmap `filters` parameter
         self.filter_info_pubs = None    # publishers on the CostmapFilterInfo topics (None = unknown)
         self.logs = {}              # LOG_* code -> [message, [times]]
@@ -217,6 +223,21 @@ class Doctor:
         if skew is not None:
             self.skew = abs(skew)
         self.tf_edges[(parent.lstrip('/'), child.lstrip('/'))] = now
+
+    def _frame_reaches_base(self, frame):
+        """True if `frame` is linked (either direction) through known TF edges to a base_link/base_footprint frame."""
+        adj = {}
+        for p, c in set(self.tf_edges) | self.static_edges:
+            adj.setdefault(p, set()).add(c)
+            adj.setdefault(c, set()).add(p)
+        seen, todo = {frame}, [frame]
+        while todo:
+            n = todo.pop()
+            if n.endswith(('base_link', 'base_footprint')):
+                return True
+            for m in adj.get(n, set()) - seen:
+                seen.add(m); todo.append(m)
+        return False
 
     def tf_static(self, parent, child):
         """A /tf_static edge (e.g. a fixed map->odom when localization is static): counts as present, never stale."""
@@ -256,6 +277,14 @@ class Doctor:
         fi = self.filter_infos.setdefault(info_topic, {'mask': mask_topic, 'since': now})
         fi.update(mask=mask_topic, type=ftype, base=base, multiplier=multiplier)
 
+    def speed_limits(self, published, heard, now):
+        """`published`: SpeedLimit topics with a publisher; `heard`: those controller_server subscribes to."""
+        self.speed_heard = sorted(heard)
+        # quiet if controller_server has no such subscription (not configured, or not visible), and if a topic it
+        # does listen to is fed (a relay may be forwarding the other one)
+        broken = heard and not set(heard) & set(published)
+        self.speed_unheard = {t: self.speed_unheard.get(t, now) for t in published} if broken else {}
+
     def bt_status(self, node_name, status, now):
         """A behaviour tree status change. Controller output is only expected while FollowPath is RUNNING."""
         if node_name == 'FollowPath':
@@ -279,7 +308,9 @@ class Doctor:
         else:
             self.cmd_since = None
 
-    def stamps(self, scan=None, tf=None):
+    def stamps(self, scan=None, tf=None, scan_frame=None):
+        if scan_frame is not None:
+            self.scan_frame = scan_frame.lstrip('/')
         if scan is not None:
             self.scan_stamp = scan
         if tf is not None:
@@ -287,6 +318,10 @@ class Doctor:
 
     def map_msg(self, free_cells, now):
         self.seen('map', now)
+        if self.map_hist:
+            last = self.map_hist[-1][1]
+            if last - free_cells >= MAP_RESET_CELLS and free_cells < last / 2:
+                self.map_hist = []   # map was reset: judge growth from here, not against the old map
         self.map_hist.append((now, free_cells))
         self.map_hist = [m for m in self.map_hist if now - m[0] <= MAP_WIN_S * 2]
 
@@ -362,6 +397,11 @@ class Doctor:
         has_map_odom = any(p.endswith('map') and c.endswith('odom') for p, c in set(self.tf_edges) | self.static_edges)
         if age_tf is not None and not has_map_odom:
             f.append(Finding('WARN', 'NO_MAP_ODOM', 'no map->odom transform - SLAM/AMCL not localizing'))
+
+        if self.scan_frame and age_tf is not None and not self._frame_reaches_base(self.scan_frame):
+            f.append(Finding('ERROR', 'SCAN_FRAME_NO_TF',
+                             f'scan frame "{self.scan_frame}" has no TF connection to the robot base - '
+                             'costmaps and SLAM cannot transform the scan'))
 
         for stream, label in (('odom', 'odometry'), ('scan', 'laser scan')):
             a = self._age(stream, now)
@@ -515,6 +555,12 @@ class Doctor:
                              f'costmap lists filters {self.filters_configured} but no CostmapFilterInfo is published - '
                              'the filters are inert'))
 
+        for topic, since in self.speed_unheard.items():
+            if now - since >= self.startup_s:
+                f.append(Finding('WARN', 'SPEED_LIMIT_UNHEARD',
+                                 f'speed limit is published on {topic} but controller_server listens on '
+                                 f'{", ".join(self.speed_heard)} - speed zones have no effect'))
+
         for code, (msg, times) in self.logs.items():
             recent = [t for t in times if now - t <= LOG_WINDOW_S]
             if recent:
@@ -579,6 +625,22 @@ def yaw_of(q):
 def diagnostics_topic(ns):
     """/diagnostics for a single robot, <ns>/diagnostics when --ns is given."""
     return (('/' + ns.strip('/')) if ns else '') + '/diagnostics'
+
+
+def speed_limit_graph(node, ns):
+    """(SpeedLimit topics with a publisher, SpeedLimit topics controller_server subscribes to) for one robot."""
+    root = ns or '/'
+    published, heard = [], []
+    for topic, types in node.get_topic_names_and_types():
+        if 'nav2_msgs/msg/SpeedLimit' not in types:
+            continue
+        if any(i.node_namespace == root or i.node_namespace.startswith(f'{ns}/')
+               for i in node.get_publishers_info_by_topic(topic)):
+            published.append(topic)
+        if any(i.node_name == 'controller_server' and i.node_namespace == root
+               for i in node.get_subscriptions_info_by_topic(topic)):
+            heard.append(topic)
+    return published, heard
 
 
 def main(argv=None):
@@ -711,7 +773,7 @@ def main(argv=None):
     node.create_subscription(Odometry, f'{ns}/odom', lambda m: d.pose(m.pose.pose.position.x, m.pose.pose.position.y, clock(), yaw_of(m.pose.pose.orientation)), sd)
     node.create_subscription(PoseWithCovarianceStamped, f'{ns}/amcl_pose',
                              lambda m: d.amcl(m.pose.covariance[0], m.pose.covariance[7], clock()), rel)
-    node.create_subscription(LaserScan, f'{ns}/scan', lambda m: (d.seen('scan', clock()), d.stamps(scan=m.header.stamp.sec + m.header.stamp.nanosec / 1e9)), sd)
+    node.create_subscription(LaserScan, f'{ns}/scan', lambda m: (d.seen('scan', clock()), d.stamps(scan=m.header.stamp.sec + m.header.stamp.nanosec / 1e9, scan_frame=m.header.frame_id)), sd)
     node.create_subscription(OccupancyGrid, f'{ns}/local_costmap/costmap',
                              lambda m: d.seen('local_costmap', clock()), rel)
     from rclpy.qos import DurabilityPolicy
@@ -812,6 +874,8 @@ def main(argv=None):
         from nav2_msgs.msg import CostmapFilterInfo
     except ImportError:    # nav2_msgs not installed: skip the filter checks
         CostmapFilterInfo = None
+
+    node.create_timer(2.0, lambda: d.speed_limits(*speed_limit_graph(node, ns), clock()))
 
     def discover_filters():
         if CostmapFilterInfo is None:

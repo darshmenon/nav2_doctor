@@ -1,4 +1,5 @@
 import os, sys
+import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from nav2_doctor.doctor import Doctor
 
@@ -721,3 +722,62 @@ def test_speed_limit_under_dwb_minimums():
     assert 'loses motions' in _limit(40)[0].msg                 # 60%: turning only
     assert not _limit(20)                                       # 80%
     assert not _limit(95, dwb={})                               # not DWB: say nothing
+
+
+def test_map_reset_and_regrowth_is_not_a_map_stall():
+    from nav2_doctor.doctor import MAP_WIN_S
+    d = healthy()
+    end = int(MAP_WIN_S)
+    for s in range(end + 1):
+        d.cmd(0.2, 0.0, float(s))
+        free = 26000 if s < 5 else 1000 + 100 * s      # reset at s=5, then regrowing
+        d.map_msg(free, float(s))
+    assert 'MAP_STALL' not in codes(d, float(end))
+
+
+def test_scan_frame_without_tf_to_base():
+    d = healthy()
+    d.stamps(scan_frame='laser')
+    assert 'SCAN_FRAME_NO_TF' in codes(d, 0.5)
+    d.tf_static('base_link', 'laser')
+    assert 'SCAN_FRAME_NO_TF' not in codes(d, 0.5)
+    d2 = healthy()
+    d2.tf_static('base_footprint', 'base_link'); d2.tf('base_link', 'lidar', 0.0)
+    d2.stamps(scan_frame='/lidar')
+    assert 'SCAN_FRAME_NO_TF' not in codes(d2, 0.5)
+
+
+def test_speed_limit_topic_controller_does_not_subscribe_to():
+    d = healthy()
+    d.speed_limits(['/gs/speed_limit'], ['/speed_limit'], 0.0)
+    assert 'SPEED_LIMIT_UNHEARD' not in codes(d, 0.0)      # startup grace
+    d.speed_limits(['/gs/speed_limit'], ['/speed_limit'], d.startup_s)
+    found = [f for f in d.diagnose(d.startup_s) if f.code == 'SPEED_LIMIT_UNHEARD']
+    assert '/gs/speed_limit' in found[0].msg and '/speed_limit' in found[0].msg
+    d.speed_limits(['/gs/speed_limit'], ['/gs/speed_limit'], d.startup_s)      # fixed
+    assert 'SPEED_LIMIT_UNHEARD' not in codes(d, d.startup_s)
+
+
+@pytest.mark.parametrize('published, heard', [
+    ([], ['/speed_limit']),                                    # nothing publishes a limit
+    (['/gs/speed_limit'], []),                                 # controller_server not visible / not configured
+    (['/gs/speed_limit', '/speed_limit'], ['/speed_limit']),   # relayed onto the topic it listens to
+])
+def test_speed_limit_topic_check_stays_quiet(published, heard):
+    d = healthy()
+    d.speed_limits(published, heard, 0.0)
+    assert 'SPEED_LIMIT_UNHEARD' not in codes(d, d.startup_s)
+
+
+@pytest.mark.parametrize('ns', ['', '/robot1'])
+def test_speed_limit_graph_reads_only_this_robot(ns):
+    from types import SimpleNamespace as N
+    from nav2_doctor.doctor import speed_limit_graph
+    mine, root = f'{ns}/gs/speed_limit', ns or '/'
+    pubs = {mine: [N(node_namespace=f'{ns}/global_costmap')], f'{ns}/speed_limit': []}
+    subs = {mine: [N(node_name='rviz', node_namespace=root)],
+            f'{ns}/speed_limit': [N(node_name='controller_server', node_namespace=root),
+                                  N(node_name='controller_server', node_namespace='/other')]}
+    node = N(get_topic_names_and_types=lambda: [(t, ['nav2_msgs/msg/SpeedLimit']) for t in pubs] + [('/scan', ['x'])],
+             get_publishers_info_by_topic=pubs.__getitem__, get_subscriptions_info_by_topic=subs.__getitem__)
+    assert speed_limit_graph(node, ns) == ([mine], [f'{ns}/speed_limit'])

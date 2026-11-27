@@ -51,6 +51,7 @@ ERROR [COSTMAP_STALE] local costmap not updating (3.8s) - usually a TF or scan p
 | `NO_PROGRESS` | warn | a goal is active but odometry shows the robot hasn't moved (15 s, 0.1 m by default) |
 | `RATE_DROP` / `RATE_SPIKE` | warn | with `--baseline`: a stream runs below half or above double the rate learned by `--learn` |
 | `FILTER_BAD_LIMIT` / `FILTER_MOSTLY_SLOW` | warn | a speed mask has cells Nav2 reads as no limit, or half of it is below 25% speed (often an inverted mask) |
+| `SPEED_LIMIT_UNHEARD` | warn | a speed limit is published on a topic `controller_server` does not subscribe to, so speed zones have no effect |
 | `FILTER_BELOW_MIN_SPEED` | warn | a speed mask can limit DWB's max speed under its minimum speed, so motions (or all samples) are rejected |
 | `CMD_ZERO` / `NO_CMD_VEL` | error | a goal is active but `cmd_vel` is zero or absent |
 

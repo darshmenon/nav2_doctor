@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- New `SPEED_LIMIT_UNHEARD`: a `nav2_msgs/SpeedLimit` topic has a publisher but `controller_server` listens elsewhere. Found in a robot config where only the costmap filter set `speed_limit_topic`. Unit-tested, and run live against two fake nodes; not yet against a real Nav2 stack.
 - New `FILTER_BELOW_MIN_SPEED`: compares the lowest percent limit in a speed mask with DWB `min_speed_xy` / `min_speed_theta`. From reading the Humble DWB source (min speeds are not scaled). Unit-tested, not yet run live.
 - New `FILTER_BAD_LIMIT` / `FILTER_MOSTLY_SLOW`: grade speed-filter mask values with the filter's base/multiplier. Added after finding inverted speed masks (`map_server` scale mode reads black as 100). Unit-tested.
 - Fix: no `NO_CMD_VEL` from the `/cmd_vel_nav` check while a recovery behaviour is driving (`FollowPath` not running).
